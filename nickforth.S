@@ -453,12 +453,14 @@ code_\label:
 
   defcode "C!",2,,STOREBYTE,SUBSTORE
   lw a0, (sp)  // address
-  lw a1, 8(sp) // byte
+  mv a1, zero
+  lb a1, 8(sp) // byte
   addi sp, sp, 16
   sb a1, (a0)
   NEXT
 
   defcode "C@",2,,FETCHBYTE,STOREBYTE
+  mv a1, zero
   lw a0, (sp)
   lb a1, (a0)
   sw a1, (sp)
@@ -468,6 +470,7 @@ code_\label:
   defcode "C@C!",4,,CCOPY,FETCHBYTE
   lw a0, (sp) // source addr
   lw a1, 8(sp) // dest addr
+  mv a2, zero
   lb a2, (a0) // byte to copy
   sb a2, (a1)
   addi a0, a0, 1 // Increment dest addr
@@ -481,10 +484,12 @@ code_\label:
   lw a1, 8(sp)  // dest
   lw a2, 16(sp) // src
 1:
+  mv a3, zero
   lb a3, (a2)
   sb a3, (a1)
-  li a4, 1
-  sub a0, a0, a4
+  addi a2, a2, 1
+  addi a1, a1, 1
+  addi a0, a0, -1
   bgtz a0, 1b
   NEXT
 
@@ -698,6 +703,7 @@ _KEY:
   la a1, serial_port_addr // Load address of variable containing address of serial port.
   lw a1, (a1)                 // Load serial port's address.
   /* Need to check read to receive? */
+  mv a0, zero
   lb a0, (a1)                 // Fetch byte from recv buffer. Offset is 0.
   /* Need to put the fetched byte into a0 */
   ret
@@ -806,6 +812,7 @@ _NUMBER:
 
 digit_read_loop:
   mul a2, a2, t6 /* a2 *= BASE */
+  mv t0, zero
   lb t0, (a1)
   addi a1, a1, 1
 
@@ -881,6 +888,7 @@ _FIND:
   la t0, var_LATEST
 find_loop:
   beqz t0, not_found
+  mv t1, zero
   lb t1, 8(t0) /* Offset of 8 to index len+flags byte because we use 64-bit words for addresses */
   li t2, F_LENMASK|F_HIDDEN
   or t1, t1, t2
@@ -891,6 +899,9 @@ find_loop:
   mv t1, t0
   addi t1, t1, 9
   mv t2, a1
+next_character:
+  mv t3, zero
+  mv t4, zero
   lb t3, (t1) /* Load the bytes representing the characters */
   lb t4, (t2)
   sub t3, t3, t4
@@ -898,8 +909,9 @@ find_loop:
   /* Else, increment them. */
   addi t1, t1, 1
   addi t2, t2, 1
+  /* Loop until we reach the null byte */
+  bnez t3, next_character
 
-  /* If we haven reached a null byte then the strings are the saem and we have a match. We can return. */
   mv a2, t0
   ret
 
@@ -920,6 +932,17 @@ not_found:
   li a2, 0
   ret
 
+  /* Now we need >CFA, which takes the pointer to the dictionary
+	defition and gets the actual executable part of the word, the
+	codeword. */
+  defcode ">CFA",4,,TFCA,FIND
+  lw a0, (sp)
+  call _TCFA
+  sw a0, (sp)
+  NEXT
+
+  /* If you lb into a register does it clear the upper bits? */
+_TCFA:
 set_up_data_segment:
 
 return_stack_top:

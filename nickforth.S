@@ -1,3 +1,4 @@
+/* -*- tab-width: 2 -*-  */
   .set NICK_VERSION,1
 
 serial_port_addr:
@@ -81,7 +82,7 @@ cold_start:
   /* Flags */
   .set F_IMMED,   0x80 /* Bits 3 and 2 ?? */
   .set F_HIDDEN,  0x20 /* Bit  1 */
-  .set F_LENMASK, 0x1f
+  .set F_LENMASK, 0x1f /* 0b 0001 1111*/
 
 /* Assembler macro that eases defining words in FORTH */
   .macro defword name, namelen, flags=0, label, lastlink=0
@@ -513,8 +514,8 @@ var_\name:
 
   defvar "STATE",5,,STATE,CMOVE
   defvar "HERE",4,,HERE,STATE
-/*  defvar "LATEST",6,,LATEST,HERE,name_SYSCALL0 */
-  defvar "S0",2,,S0,HERE
+  defvar "LATEST",6,,LATEST,HERE,0 /* Stand-in value */
+  defvar "S0",2,,S0,LATEST
   defvar "BASE",4,,BASE,S0,10
 
   /*
@@ -714,6 +715,7 @@ _EMIT:
   sb a0, (a1) /* Store the byte to the recv/transmit buffer */
   ret
 
+  /* WORD reads the next full word of input. */
   defcode "WORD",4,,WORD,EMIT
   call _WORD
   sw a0,  (sp)  /* Base address of buffer */
@@ -831,18 +833,95 @@ got_digit:
   addi a0, a0, -1
   bnez a0, digit_read_loop
 
-  /* We get here when we're done either because no more characters or an error. If t3 */
+  /* We get here when we're done either because no more characters or an error.  */
 need_negate:
+  /* If t3 == 0, the number is negative. Skip this if t3 DOES NOT equal zero. */
   bnez t3, number_done
   neg a2, a2
 
 number_done:
   ret
 
-  /* Check if the first character is '-'   */
+  /* Now we implement FIND, the way to find a dictionary entry for a
+	word indicated by a string. */
+
+  defcode "FIND",4,,FIND,NUMBER
+  lw a0, (sp)  /* Length of string */
+  lw a1, 8(sp) /* Address of string */
+  call _FIND
+  sw a2, 8(sp)
+  addi sp, sp, -8
+  NEXT
+
+  /*
+  +---------+---+---+---+---+---+---+---+---+------------+------------+------------+----------  --+
+	| LINK    | 6 | D | O | U | B | L | E | 0 | DOCOL      | DUP        | +          | EXIT       |
+	+---------+---+---+---+---+---+---+---+---+------------+------------+------------+------------+
+
+  Considering that a dictionary entry looks like this, we can work
+	back through the chain by repeated loads:
+
+name_C: [0x3000]
+  .int name_B <-- 0x2000
+
+name_B: [0x2000]
+  .int name_A <-- 0x1000
+
+name_A: [0x1000]
+  .int 0
+
+  The original Jonesforth uses a length to shortcut certain words. We
+	do a cheaper numerical check against the length in the dictionary
+	and if they don't match we move on.
+
+  Makes me wonder if we could do something with a hash entry also.
+
+  */
+_FIND:
+  la t0, var_LATEST
+find_loop:
+  beqz t0, not_found
+  lb t1, 8(t0) /* Offset of 8 to index len+flags byte because we use 64-bit words for addresses */
+  li t2, F_LENMASK|F_HIDDEN
+  or t1, t1, t2
+  sub t1, t1, a0
+  bnez t1, next_word /* If the lengths don't match or hidden is set, go on to the next word. */
+
+  /* Compare strings more carefully, starting from the first byte. */
+  mv t1, t0
+  addi t1, t1, 9
+  mv t2, a1
+  lb t3, (t1) /* Load the bytes representing the characters */
+  lb t4, (t2)
+  sub t3, t3, t4
+  bnez t3, next_word /* If they aren't the same, skip ahead */
+  /* Else, increment them. */
+  addi t1, t1, 1
+  addi t2, t2, 1
+
+  /* If we haven reached a null byte then the strings are the saem and we have a match. We can return. */
+  mv a2, t0
+  ret
+
+  /* The LINK pointer (in our case, var_\LAST) is always at the
+	beginning of the definition. That is, at 0x5000, the definition for
+	DUP or whatever:
+
+@0x5000  | 0x4000 | LEN+FLAGS | DUP\0 | ...
+         ^
+         |--- t0
+
+  */
+next_word:
+  lw t0, (t0)
+  j find_loop
+
+not_found:
+  li a2, 0
+  ret
+
 set_up_data_segment:
 
 return_stack_top:
 
 QUIT:
-

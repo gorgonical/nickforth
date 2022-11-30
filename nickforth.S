@@ -37,9 +37,8 @@ serial_port_addr:
   */
   .macro NEXT
   lw   t0, (gp)    /* Load address of the next codeword from gp */
-  lw   t1, (t0)    /* Load whatever the codeword points to */
   addi gp, gp, 8   /* Increment gp */
-  jr   t1          /* Jump to t0, what the codeword pointed to. */
+  jalr zero, (t1)        /* Jump to t0, what the codeword pointed to. */
   .endm
 
   /* We use fp for the return stack. */
@@ -721,11 +720,11 @@ _EMIT:
   sb a0, (a1) /* Store the byte to the recv/transmit buffer */
   ret
 
-  /* WORD reads the next full word of input. */
+  /* WORD reads the next full word of input as a string. */
   defcode "WORD",4,,WORD,EMIT
   call _WORD
   sw a0,  (sp)  /* Base address of buffer */
-  sw a1, 8(sp) /* Length of read word */
+  sw a1, 8(sp)  /* Length of read word */
   addi sp, sp, 16
   NEXT
 
@@ -899,6 +898,7 @@ find_loop:
   mv t1, t0
   addi t1, t1, 9
   mv t2, a1
+  mv t6, a0 /* Copy length also */
 next_character:
   mv t3, zero
   mv t4, zero
@@ -910,8 +910,10 @@ next_character:
   addi t1, t1, 1
   addi t2, t2, 1
   /* Loop until we reach the null byte */
-  bnez t3, next_character
+  addi t6, t6, -1
+  bnez t6, next_character
 
+  /* If we get here we have checked every byte and they all matched. */
   mv a2, t0
   ret
 
@@ -935,14 +937,252 @@ not_found:
   /* Now we need >CFA, which takes the pointer to the dictionary
 	defition and gets the actual executable part of the word, the
 	codeword. */
-  defcode ">CFA",4,,TFCA,FIND
-  lw a0, (sp)
+  defcode ">CFA",4,,TCFA,FIND
+  lw a0, (sp) /* The pointer to the beginning of the definition */
   call _TCFA
   sw a0, (sp)
   NEXT
 
   /* If you lb into a register does it clear the upper bits? */
 _TCFA:
+  mv t0, zero
+  lb t0, 8(a0) /* Load len+flags byte */
+  li t1, F_LENMASK
+  and t0, t0, t1 /* Mask to get the length. */
+  add t1, a0, 9 /* Point to the name */
+  add t1, t1, t0 /* Skip the length of the name */
+  /* Byte-align (4? 8?) */
+  addi t1, t1, 3
+  and  t1, t1, ~3
+  ret
+
+  /* And also we will have a >DFA, which converts the DEA (dictionary entry address) to the data field address (DFA). */
+  defword ">DFA",4,,TDFA,TCFA
+  .word TCFA
+  .word INCR4
+  .word INCR4
+  .word EXIT
+
+  /* Now for compiling. We have to solve some problems:
+      1. Where do new words go?
+      2. How do we read words?
+      3. How do we define COLON and SEMICOLON?
+
+  So we define an INTERPRET function, wihch reads words, looks them
+	up, turns them into codeword pointers, and decides what to do with
+	them.
+
+  When STATE is zero, the interpreter just runs the words as it looks
+	them up: immediate mode.
+
+  When STATE is in compoling mode when STATE is non-zero. The
+	interpreter appends the codeword pointer to user memory (where the
+	HERE variable points)
+
+  So here's how we define COLON:
+      1. WORD reads the name
+      2. Construct the dictionary header in user memory.
+
+    pointer to previous word (from LATEST)          			+-- Afterwards, HERE points here, where
+	   ^                                      							|   the interpreter will start appending
+	   |                                      							V   codewords.
+	+--|------+---+---+---+---+---+---+---+---+------------+
+	| LINK    | 6 | D | O | U | B | L | E | 0 | DOCOL      |
+	+---------+---+---+---+---+---+---+---+---+------------+
+             len                         pad  codeword
+
+
+      3. Make LATEST point to the newly defined word
+      4. And make HERE point to just after the new codeword. New codewords go here.
+      5. Set STATE to 1. This sets compile mode so the interpreter starts appending words.
+
+  After : has run, this is where we are:
+      :  DOUBLE DUP + ;
+                ^
+                | Next byte returned by KEY will be the 'D' character of DUP.
+
+  Then DUP is read, looked up, and appended:
+
+                                                									     +-- HERE updated to point here.
+                                                									     |
+                                                									     V
+	+---------+---+---+---+---+---+---+---+---+------------+------------+
+	| LINK    | 6 | D | O | U | B | L | E | 0 | DOCOL      | DUP        |
+	+---------+---+---+---+---+---+---+---+---+------------+------------+
+             len                         pad  codeword
+
+
+  But how do we get out of compiling mode? We don't want ; to be read
+	and appended. So we could either make the interpreter specially
+	check if its SEMICOLON, or we can define a general way to do it. So,
+	what the interpreter does is check the word's flags for F_IMMED. If
+	that's set, the word is executed _right now_, regardless of STATE.
+
+  So all SEMICOLON does is append EXIT, and set STATE to 0. 
+
+  However, we actually write a part of COLON as its own word, CREATE, which we define first. 
+
+  */
+
+  defcode "CREATE",6,,CREATE,TDFA
+
+  // Get name length and address
+  lw a0, (sp)  // length
+  lw a1, 8(sp) // address of name
+  addi sp, sp, 16
+
+  /*
+    Always confusing when this is a double-pointer.
+    Addr
+    0x1000 == var_HERE: 0xfc00
+    0x2000
+    0x3000
+    ...
+
+    So,
+      la t2, var_HERE
+    means t2 now contains 0x1000. It contains the _address of_ var_HERE.
+      lw t3, (t2)
+    Loads the word from 0x1000 into t3. t3 now contains 0xfc00, the _value_ of var_HERE.
+  */
+  /* Need to get whatever the LATEST defined word is and start the new
+	word header by writing it at where HERE points */
+  la t0, var_LATEST
+  lw t1, (t0)
+
+  la t6, var_HERE
+  lw t3, (t6)
+  mv t5, t3 /* Copy the _value_ of HERE for later when we update LATEST */
+
+  /* Now, store the _value_ of LATEST (a memory address) at the
+	_value_ of HERE (also a memory address)
+  */
+  sw t1, (t3)
+  /* Increment the _value_ of HERE by 8 (not written-back) */
+  addi t3, t3, 8
+
+  /* Store the length byte next, also at the _value_ of HERE. */
+  sb a0, (t3)
+  addi t3, t3, 1
+
+  /* Store the actual word itself, byte by byte */
+store_chars:
+  mv t2, zero
+  lb t2, (a1)    /* Get character from name */
+  addi a1, a1, 1
+  sb t2, (t3)    /* Put character at HERE   */
+  addi t3, t3, 1
+
+  addi a0, a0, -1
+  bnez a0, store_chars
+
+  /* Align */
+  addi t3, t3, 3
+  and  t3, t3, ~3
+
+  /* Update the _value_ of LATEST with what HERE was when we started,
+	as it is now the LINK pointer to the most recently-defined word. */
+  sw t5, (t0)
+  /* Now, write back the _value_ of HERE. */
+  sw t3, (t6)
+  NEXT
+
+  /* We need to define another word, COMMA, which appends a
+	word-length integer to wherever HERE points. */
+  defcode ",",1,,COMMA,CREATE
+  lw a0, (sp)
+  addi sp, sp, 8
+  call _COMMA
+  NEXT
+
+_COMMA:
+  la t0, var_HERE
+  lw t1, (t0)
+  sw a0, (t1) // Store the word
+  addi t1, t1, 8  // Increment and
+  sw t1, (t0)     // update HERE
+  ret
+
+  /* We need to define some words that change the compiler state. */
+  defcode "[",1,F_IMMED,LBRAC,COMMA
+  la t0, var_STATE
+  sw zero, (t0) // Set STATE to 0.
+  NEXT
+
+  defcode "]",1,,RBRAC,LBRAC
+  la t0, var_STATE
+  li t1, 1
+  sw t1, (t0) // Set STATE to 1.
+  NEXT
+
+
+  /* Toggle the hidden flag of the word at addr. To change the latest:
+      LATEST @ HIDDEN
+  */
+  defcode "HIDDEN",6,,HIDDEN,RBRAC
+  lw a0, (sp)
+  addi sp, sp, 8
+  addi a0, a0, 8 // Skip to the name/flags byte
+  mv t0, zero
+  lb t0, (a0)
+  xori t0, t0, F_HIDDEN
+  sb t0, (a0)
+  NEXT
+
+  /* IMMEDIATE toggles the immediate flag of the most recently-defined word. */
+  defcode "IMMEDIATE",9,F_IMMED,IMMEDIATE,HIDDEN
+  la t0, var_LATEST // Load the _address_ of LATEST
+  lw t1, (t0)       // Load the _value_ of LATEST
+  addi t1, t1, 8    // Skip to the name/flags byte.
+  mv t2, zero
+  lb t2, (t1)
+  xor t2, t2, F_IMMED
+  sb t2, (t1)
+  NEXT
+
+  /* And now, we can define COLON using CREATE (and these other words.) */
+  defword ":",1,,COLON,IMMEDIATE
+  .word WORD                  // Get the name of the new word
+  .word CREATE                // Create the header
+  .word LIT, DOCOL, COMMA     // Append docol
+  .word LATEST, FETCH, HIDDEN // Fetch the latest word, make it hidden
+  .word RBRAC                 // Compile mode
+  .word EXIT                  // Return from function.
+
+  /* SEMICOLON is also simple. */
+  defword ";",1,F_IMMED,SEMICOLON,COLON
+  .word LIT, EXIT, COMMA        // Append EXIT
+  .word LATEST, FETCH, HIDDEN   // Toggle hidden flag to make it unhidden
+  .word LBRAC                   // Go back to immediate mode
+  .word EXIT
+
+  defword "HIDE",4,,HIDE,SEMICOLON
+  .word WORD      // Get the word
+  .word FIND      // Find that word
+  .word HIDDEN    // Set it to hidden
+  .word EXIT
+
+  defcode "'",1,,TICK,HIDE
+  lw t0, (gp)
+  addi gp, gp, 8
+  sw t0, (sp)
+  addi sp, sp, -8
+  NEXT
+
+  defcode "BRANCH",6,,BRANCH,TICK
+  lw t0, (gp)
+  add gp, gp, t0
+  NEXT
+
+  defcode "0BRANCH",7,,ZBRANCH,BRANCH
+  lw a0, (sp)
+  addi sp, sp, -8
+  beqz a0, code_BRANCH
+  addi gp, gp, 8
+  NEXT
+
+
+
 set_up_data_segment:
 
 return_stack_top:

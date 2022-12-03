@@ -1,4 +1,4 @@
-/* -*- tab-width: 2 -*-  */
+ /* -*- tab-width: 2 -*-  */
   .set NICK_VERSION,1
 
 serial_port_addr:
@@ -55,7 +55,7 @@ serial_port_addr:
   .endm
 
   .text
-  .align 8
+  .align 3
 
   /* t0 points to the codeword after calling NEXT, which means we can
 	advance a word to enter the definition. */
@@ -86,13 +86,13 @@ cold_start:
 /* Assembler macro that eases defining words in FORTH */
   .macro defword name, namelen, flags=0, label, lastlink=0
   .section .rodata
-  .align 8
+  .align 3
   .globl name_\label
 name_\label:
   .int name_\lastlink
   .byte \flags+\namelen
   .ascii "\name"
-  .align 8
+  .align 3
   .globl \label
 \label:
   .int DOCOL
@@ -102,13 +102,13 @@ name_\label:
 /* Assembler macro that eases defining words in assembly */
   .macro defcode name, namelen, flags=0, label, lastlink=0
   .section .rodata
-  .align 8
+  .align 3
   .globl name_\label
 name_\label:
   .int name_\lastlink
   .byte \flags+\namelen
   .ascii "\name"
-  .align 8
+  .align 3
   .globl \label
 \label:
   .int code_\label
@@ -498,10 +498,10 @@ code_\label:
   defcode \name,\namelen,\flags,\label,\prev
   la t0, var_\name
   sw t0, (sp)
-  addi sp, sp, 8
+  addi sp, sp, -8
   NEXT
   .data
-  .align 4
+  .align 2
 var_\name:
   .int \initial
   .endm
@@ -530,7 +530,7 @@ var_\name:
   defcode \name,\namelen,\flags,\label,\prev
   li t0, \value
   sw t0, (sp)
-  addi sp, sp, 8
+  addi sp, sp, -8
   NEXT
   .endm
 
@@ -538,7 +538,7 @@ var_\name:
   defcode \name,\namelen,\flags,\label,\prev
   la t0, \value
   sw t0, (sp)
-  addi sp, sp, 8
+  addi sp, sp, -8
   NEXT
   .endm
 
@@ -610,6 +610,7 @@ var_\name:
   defcode "DSP@",4,,DSPFETCH,RDROP 
   mv sp, a0
   sw a0, (sp)
+  addi sp, sp, -8
   NEXT
 
   /* Replaces the current parameter stack with whatever's on the top
@@ -725,7 +726,7 @@ _EMIT:
   call _WORD
   sw a0,  (sp)  /* Base address of buffer */
   sw a1, 8(sp)  /* Length of read word */
-  addi sp, sp, 16
+  addi sp, sp, -16
   NEXT
 
 _WORD:
@@ -754,7 +755,7 @@ _WORD:
 
   /* Return the word (the static buffer) and its length */
   la a0, word_buffer
-  sub a1, a2, a0 /* a2 now contains the length in bytes. */
+  sub a1, a2, a0 /* a1 now contains the length in bytes. */
   ret
 
   /* Code to skip \ comments to end of the current line. */
@@ -856,7 +857,7 @@ number_done:
   lw a1, 8(sp) /* Address of string */
   call _FIND
   sw a2, 8(sp)
-  addi sp, sp, -8
+  addi sp, sp, 8
   NEXT
 
   /*
@@ -953,7 +954,7 @@ _TCFA:
   add t1, t1, t0 /* Skip the length of the name */
   /* Byte-align (4? 8?) */
   addi t1, t1, 3
-  and  t1, t1, ~3
+  and  a0, t1, ~3
   ret
 
   /* And also we will have a >DFA, which converts the DEA (dictionary entry address) to the data field address (DFA). */
@@ -1181,10 +1182,134 @@ _COMMA:
   addi gp, gp, 8
   NEXT
 
+  defcode "LITSTRING",9,,LITSTRING,ZBRANCH
+  lw a0, (gp)     // Get the length of the string
+  addi gp, gp, 8  // Move gp forward
+  lw a1, (gp)
 
+  sw a1, (sp)
+  sw a2, -8(sp)
+  addi sp, sp, -16
 
+  add gp, gp, a0  // Skip the literal string
+  addi gp, gp, 3  // Advance to the next 4-byte boundary
+  addi gp, gp, ~3
+  NEXT
+
+  defcode "TELL",4,,TELL,LITSTRING
+  lw a0, (sp)  // length of string
+  lw a1, 8(sp) // address of string
+  addi sp, sp, 16
+  call _TELL
+  NEXT
+
+_TELL:
+  la t0, serial_port_addr /* _address_ of the serial_port_addr variable */
+  lw t0, (t0)             /* _value_ of the serial_port_addr variable (also an address) */
+  mv t1, zero
+write_char_loop:
+  lb t1, (a1)
+  addi a1, a1, 1
+  sb t1, (t0)
+  addi a0, a0, -1
+  bnez a0, write_char_loop
+  /* NMG TODO Probably put a wait in here */
+  ret
+
+  defword "QUIT",4,,QUIT,TELL
+  .word RZ,RSPSTORE // R0 RSP!, clear the return stack
+  .word INTERPRET   // interpret the next word
+  .word BRANCH,-16  // and loop forever
+
+  /* There is no way this is correct. Need to graph this out */
+  defcode "INTERPRET",9,,INTERPRET,QUIT
+  call _WORD // a0 base address, a1 length
+
+  mv t0, zero
+  la t1, interpret_is_lit
+  li t2, 0
+  sw t2, (t1)
+  mv a5, a0
+  mv a6, a1
+  call _FIND // a2 contains either 0 or the address of the found word
+  beqz a2, not_in_dict
+
+  /* If we don't jump, it is in the dictionary. Is it IMMEDIATE? */
+  mv t3, zero
+  lb t3, 8(a2) // Get name+flags
+  mv a0, a2 // set up for _TCFA
+  call _TCFA // codeword pointer now in a0
+  li t6, F_IMMED
+  and t4, t3, t6
+  bnez t4, executing // If immediate, go straight to execution
+  j compile_execute_p
+
+not_in_dict: // 1
+  /* Set variable indicating lit */
+  li t4, 1
+  la t1, interpret_is_lit
+  sw t4, (t1)
+
+  /*  We assume its a number at this point
+      Restore a0, a1 for _NUMBER
+  */
+  mv a0, a5
+  mv a1, a6
+  call _NUMBER // a0 is unparsed characters or 0 on no-len, a2 is parsed number
+  bnez a0, parse_error
+  la a0, LIT // Prepare to run LIT with the word.
+  mv a1, a2
+
+compile_execute_p: // 2
+  la a5, var_STATE
+  lw a5, (a5)
+  beqz a5, executing
+
+  /* Compiling. Just append the word  */
+  call _COMMA
+  la a4, interpret_is_lit // Check if we are compiling a literal
+  lw a4, (a4)
+  beqz a4, next_terminus  // If we are compiling lit, we need to also append the number.
+  mv a0, a1
+  call _COMMA
+
+next_terminus:
+  NEXT
+
+executing: // 4
+  // Check if we are interpreting lit
+  la a5, interpret_is_lit
+  lw a5, (a5)
+  bnez a5, execute_literal
+
+  // Not a literal, execute it now
+  jalr zero, (a0)
+
+execute_literal: // 5
+  sw a1, (sp)
+  addi sp, sp, -8
+  NEXT
+
+parse_error: // 6
+
+  .data
+  .align 3
+interpret_is_lit:
+  .int 0
+
+  .text
+  .set INITIAL_DATA_SEGMENT_SIZE,65536
 set_up_data_segment:
+  /* Actually set this up somehow. */
 
+  
+
+	.set RETURN_STACK_SIZE,8192
+
+	.bss
+/* Forth return stack */
+  .align 12
+return_stack:
+  .space RETURN_STACK_SIZE
 return_stack_top:
-
-QUIT:
+  .align 12

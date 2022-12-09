@@ -1,9 +1,6 @@
  /* -*- tab-width: 2 -*-  */
   .set NICK_VERSION,1
 
-serial_port_addr:
-  .word 0x0
-
   /*
   If we assume we have the list of addresses to jump to at some point
 	in memory, say 0x1000, we need a register that points there and we
@@ -38,7 +35,8 @@ serial_port_addr:
   .macro NEXT
   lw   t0, (gp)    /* Load address of the next codeword from gp */
   addi gp, gp, 8   /* Increment gp */
-  jalr zero, (t1)        /* Jump to t0, what the codeword pointed to. */
+  lw t1,(t0) 
+  jr t1 /* Jump to t1, what the codeword pointed to. */
   .endm
 
   /* We use fp for the return stack. */
@@ -57,6 +55,8 @@ serial_port_addr:
   .text
   .align 3
 
+  j _start
+
   /* t0 points to the codeword after calling NEXT, which means we can
 	advance a word to enter the definition. */
 name_0:
@@ -69,14 +69,14 @@ DOCOL:
   .globl _start
 _start:
   la fp, return_stack_top
-  call set_up_data_segment
+  /* call set_up_data_segment */
 
   la gp, cold_start
   NEXT
 
   .section .rodata
 cold_start:
-  .int QUIT
+  .word QUIT
 
   /* Flags */
   .set F_IMMED,   0x80 /* Bits 3 and 2 ?? */
@@ -1297,6 +1297,9 @@ parse_error: // 6
 interpret_is_lit:
   .int 0
 
+serial_port_addr:
+  .word 0x0
+
   .text
   .set INITIAL_DATA_SEGMENT_SIZE,65536
 set_up_data_segment:
@@ -1311,5 +1314,7 @@ set_up_data_segment:
   .align 12
 return_stack:
   .space RETURN_STACK_SIZE
+  .globl return_stack_top
 return_stack_top:
+  .word 0x0
   .align 12

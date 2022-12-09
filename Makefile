@@ -1,6 +1,17 @@
 CROSS_COMPILE := riscv64-buildroot-linux-uclibc-
+OBJCOPY		     = $(CROSS_COMPILE)objcopy
 
-all: nickforth
+all: nickforth.bin
 
 nickforth: nickforth.S
-	$(CROSS_COMPILE)gcc -O0 -Wl,-Ttext,0 -nostdlib -static $(BUILD_ID_NONE) -o $@ $<
+	$(CROSS_COMPILE)gcc -g -O0 -nostdlib -static \
+		-Tlinker.ld \
+		-Wl,-Ttext,0 \
+		-Wl,-static \
+		$(BUILD_ID_NONE) -o $@ $<
+
+nickforth.bin: nickforth
+	$(OBJCOPY) -O binary $< $@
+
+clean:
+	rm nickforth.bin nickforth

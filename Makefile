@@ -6,7 +6,7 @@ all: nickforth.bin
 nickforth: nickforth.S
 	$(CROSS_COMPILE)gcc -g -O0 -nostdlib -static \
 		-Tlinker.ld \
-		-Wl,-Ttext,0 \
+		-Wl,-Ttext,0x80200000 \
 		-Wl,-static \
 		$(BUILD_ID_NONE) -o $@ $<
 

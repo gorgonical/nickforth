@@ -33,9 +33,9 @@
 
   */
   .macro NEXT
-  lw   t0, (gp)    /* Load address of the next codeword from gp */
+  ld   t0, (gp)    /* Load address of the next codeword from gp */
   addi gp, gp, 8   /* Increment gp */
-  lw t1,(t0) 
+  ld t1,(t0) 
   jr t1 /* Jump to t1, what the codeword pointed to. */
   .endm
 
@@ -44,11 +44,11 @@
   /* Stack pointer always points to the last thing pushed. */
   .macro PUSHRSP reg
   addi fp, fp, -8
-  sw \reg, (fp)
+  sd \reg, (fp)
   .endm
 
   .macro POPRSP reg
-  lw \reg, (fp)
+  ld \reg, (fp)
   addi fp, fp, 8
   .endm
 
@@ -127,43 +127,43 @@ code_\label:
   NEXT
 
   defcode "SWAP",4,,SWAP,DROP
-  lw a0, (sp)
-  lw a1, 8(sp)
-  sw a0, 8(sp)
-  sw a1, (sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
+  sd a0, 8(sp)
+  sd a1, (sp)
   NEXT
 
   defcode "DUP",3,,DUP,SWAP
-  lw a0, (sp)
+  ld a0, (sp)
   addi sp, sp, -8
-  sw a0, (sp)
+  sd a0, (sp)
   NEXT
 
   /* DUP, but the second element of the stack. */
   defcode "OVER",4,,OVER,DUP
-  lw a0, 8(sp)
+  ld a0, 8(sp)
   addi sp, sp, -8
-  sw a0, (sp)
+  sd a0, (sp)
   NEXT
 
   /* Given stack elements 1<-2<-3, re-arrange them to be 3<-1<-2 */
   defcode "ROT",3,,ROT,OVER
-  lw a0, (sp)
-  lw a1, 8(sp)
-  lw a2, 16(sp)
-  sw a1, 16(sp)
-  sw a0, 8(sp)
-  sw a2, (sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
+  ld a2, 16(sp)
+  sd a1, 16(sp)
+  sd a0, 8(sp)
+  sd a2, (sp)
   NEXT
 
   /* Given stack elements 1<-2<-3, re-arrange them to be 2<-3<-1 */
   defcode "-ROT",4,,NROT,ROT
-  lw a0, (sp)
-  lw a1, 8(sp)
-  lw a2, 16(sp)
-  sw a0, 16(sp)
-  sw a2, 8(sp)
-  sw a1, (sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
+  ld a2, 16(sp)
+  sd a0, 16(sp)
+  sd a2, 8(sp)
+  sd a1, (sp)
   NEXT
 
   defcode "2DROP",5,,TWODROP,NROT
@@ -171,79 +171,79 @@ code_\label:
   NEXT
 
   defcode "2DUP",4,,TWODUP,TWODROP
-  lw a0, (sp)
-  lw a1, 8(sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
   addi sp, sp, -16
-  sw a1, 8(sp)
-  sw a0, (sp)
+  sd a1, 8(sp)
+  sd a0, (sp)
   NEXT
 
   /* Swap top two pairs of stack: 1234 -> 3412 */
   defcode "2SWAP",5,,TWOSWAP,TWODUP
-  lw a0, (sp)
-  lw a1, 8(sp)
-  lw a2, 16(sp)
-  lw a3, 24(sp)
-  sw a2, (sp)
-  sw a3, 8(sp)
-  sw a0, 16(sp)
-  sw a1, 24(sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
+  ld a2, 16(sp)
+  ld a3, 24(sp)
+  sd a2, (sp)
+  sd a3, 8(sp)
+  sd a0, 16(sp)
+  sd a1, 24(sp)
   NEXT
 
   /* Duplicate top of stack if its non-zero */
   defcode "?DUP",4,,QDUP,TWOSWAP
-  lw a0, (sp)
+  ld a0, (sp)
   beqz a0, 1f
   addi sp, sp, -8
-  sw a0, (sp)
+  sd a0, (sp)
 1:NEXT
 
   defcode "1+",2,,INCR,QDUP
-  lw a0, (sp)
+  ld a0, (sp)
   addi a0, a0, 1
-  sw a0, (sp)
+  sd a0, (sp)
   NEXT
 
   defcode "1-",2,,DECR,INCR
-  lw a0, (sp)
+  ld a0, (sp)
   addi a0, a0, -1
-  sw a0, (sp)
+  sd a0, (sp)
   NEXT
 
   defcode "4+",2,,INCR4,DECR
-  lw a0, (sp)
+  ld a0, (sp)
   addi a0, a0, 4
-  sw a0, (sp)
+  sd a0, (sp)
   NEXT
 
   defcode "4-",2,,DECR4,INCR4
-  lw a0, (sp)
+  ld a0, (sp)
   addi a0, a0, -4
-  sw a0, (sp)
+  sd a0, (sp)
   NEXT
 
   defcode "+",1,,ADD,DECR4
-  lw a0, (sp)
-  lw a1, 8(sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
   addi sp, sp, 8
   add a1, a0, a1
-  sw a1, (sp)
+  sd a1, (sp)
   NEXT
 
   defcode "-",1,,SUB,ADD
-  lw a0, (sp)
-  lw a1, 8(sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
   addi sp, sp, 8
   sub a1, a1, a0
-  sw a1, (sp)
+  sd a1, (sp)
   NEXT
 
   defcode "*",1,,MUL,SUB
-  lw a0, (sp)
-  lw a1, 8(sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
   addi sp, sp, 8
   mul a1, a0, a1
-  sw a1, (sp)
+  sd a1, (sp)
   NEXT
 
 /*
@@ -254,149 +254,149 @@ code_\label:
 */
 
   defcode "DIV",1,,DIV,MUL
-  lw a0, (sp)
-  lw a1, 8(sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
   addi sp, sp, 8
   div a1, a1, a0
-  sw a1, (sp)
+  sd a1, (sp)
   NEXT
 
   defcode "MOD",4,,MOD,DIV
-  lw a0, (sp)
-  lw a1, 8(sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
   addi sp, sp, 8
   rem a1, a1, a0
-  sw a1, (sp)
+  sd a1, (sp)
   NEXT
 
   defcode "=",1,,EQU,MOD
-  lw a0, (sp)
-  lw a1, 8(sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
   addi sp, sp, 8
   sub a1, a1, a0
   seqz a1, a1
-  sw a1, (sp)
+  sd a1, (sp)
   NEXT
 
   defcode "<>"2,,NEQU,EQU
-  lw a0, (sp)
-  lw a1, 8(sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
   addi sp, sp, 8
   sub a1, a1, a0
   snez a1, a1
-  sw a1, (sp)
+  sd a1, (sp)
   NEXT
 
   defcode "<",1,,LT,NEQU
-  lw a0, (sp)
-  lw a1, 8(sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
   addi sp, sp, 8
   sub a1, a1, a0
   sltz a1, a1
-  sw a1, (sp)
+  sd a1, (sp)
   NEXT
 
   defcode ">",1,,GT,LT
-  lw a0, (sp)
-  lw a1, 8(sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
   addi sp, sp, 8
   sub a1, a1, a0
   sgtz a1, a1
-  sw a1, (sp)
+  sd a1, (sp)
   NEXT
 
   /* RISC-V does not have compound comparisons so we have to achieve
 	it with either less than zero or equal zero comparisons */
   defcode "<=",2,,LE,GT
-  lw a0, (sp)
-  lw a1, 8(sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
   addi sp, sp, 8
   sub a1, a1, a0
   seqz a0, a1
   sltz a1, a1
   or a1, a1, a0
-  sw a1, (sp)
+  sd a1, (sp)
   NEXT
 
   defcode ">=",2,,GE,LE
-  lw a0, (sp)
-  lw a1, 8(sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
   addi sp, sp, 8
   sub a1, a1, a0
   seqz a0, a1
   sgtz a1, a1
   or a1, a1, a0
-  sw a1, (sp)
+  sd a1, (sp)
   NEXT
 
   defcode "0=",2,,ZEQU,GE
-  lw a0, (sp)
+  ld a0, (sp)
   seqz a0, a0
-  sw a0, (sp)
+  sd a0, (sp)
   NEXT
 
   defcode "0<>"3,,ZNEQU,ZEQU
-  lw a0, (sp)
+  ld a0, (sp)
   snez a0, a0
-  sw a0, (sp)
+  sd a0, (sp)
   NEXT
 
   defcode "0<",2,,ZLT,ZNEQU
-  lw a0, (sp)
+  ld a0, (sp)
   sltz a0, a0
-  sw a0, (sp)
+  sd a0, (sp)
   NEXT
 
   defcode "0>",2,,ZGT,ZLT
-  lw a0, (sp)
+  ld a0, (sp)
   sgtz a0, a0
-  sw a0, (sp)
+  sd a0, (sp)
   NEXT
 
   defcode "0<=",3,,ZLE,ZGT
-  lw a0, (sp)
+  ld a0, (sp)
   sltz a1, a0
   seqz a0, a0
   or a0, a0, a1
-  sw a0, (sp)
+  sd a0, (sp)
   NEXT
 
   defcode "0>=",3,,ZGE,ZLE
-  lw a0, (sp)
+  ld a0, (sp)
   sgtz a1, a0
   seqz a0, a0
   or a0, a0, a1
-  sw a0, (sp)
+  sd a0, (sp)
   NEXT
 
   defcode "AND",3,,AND,ZGE
-  lw a0, (sp)
-  lw a1, 8(sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
   addi sp, sp, 8
   and a0, a0, a1
-  sw a0, (sp)
+  sd a0, (sp)
   NEXT
 
   defcode "OR",2,,OR,AND
-  lw a0, (sp)
-  lw a1, 8(sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
   addi sp, sp, 8
   or a0, a0, a1
-  sw a0, (sp)
+  sd a0, (sp)
   NEXT
 
   defcode "XOR",3,,XOR,OR
-  lw a0, (sp)
-  lw a1, 8(sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
   addi sp, sp, 8
   xor a0, a0, a1
-  sw a0, (sp)
+  sd a0, (sp)
   NEXT
 
   defcode "INVERT",6,,INVERT,XOR
-  lw a0, (sp)
+  ld a0, (sp)
   not a0, a0
-  sw a0, (sp)
+  sd a0, (sp)
   NEXT
 
   defcode "EXIT",4,,EXIT,INVERT
@@ -409,49 +409,49 @@ code_\label:
 	and then advance past that.
   */
   defcode "LIT",3,,LIT,EXIT
-  lw a0, (gp)
+  ld a0, (gp)
   addi gp, gp, 8
-  sw a0, (sp)
+  sd a0, (sp)
   addi sp, sp, 8
   NEXT
 
   /* Here are all the memory manipulation words. */
 
   defcode "!",1,,STORE,LIT
-  lw a0, (sp)
-  lw a1, 8(sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
   addi sp, sp, 16
-  sw a1, (a0)
+  sd a1, (a0)
   NEXT
 
   defcode "@",1,,FETCH,STORE
-  lw a0, (sp) // address
-  lw a1, (a0) // fetched
-  sw a1, (sp) //store on stack
+  ld a0, (sp) // address
+  ld a1, (a0) // fetched
+  sd a1, (sp) //store on stack
   NEXT
 
   defcode "+!",2,,ADDSTORE,FETCH
-  lw a0, (sp)  // address
-  lw a1, 8(sp) // amt to add
+  ld a0, (sp)  // address
+  ld a1, 8(sp) // amt to add
   addi sp, sp, 16
-  lw a2, (a0)
+  ld a2, (a0)
   add a2, a2, a1
-  sw a2, (a0)
+  sd a2, (a0)
   NEXT
 
   defcode "-!",2,,SUBSTORE,ADDSTORE
-  lw a0, (sp)
-  lw a1, 8(sp)
+  ld a0, (sp)
+  ld a1, 8(sp)
   addi sp, sp, 16
-  lw a2, (a0)
+  ld a2, (a0)
   sub a2, a2, a1
-  sw a2, (a0)
+  sd a2, (a0)
   NEXT
 
   /* And some that operate on bytes only */
 
   defcode "C!",2,,STOREBYTE,SUBSTORE
-  lw a0, (sp)  // address
+  ld a0, (sp)  // address
   mv a1, zero
   lb a1, 8(sp) // byte
   addi sp, sp, 16
@@ -460,28 +460,28 @@ code_\label:
 
   defcode "C@",2,,FETCHBYTE,STOREBYTE
   mv a1, zero
-  lw a0, (sp)
+  ld a0, (sp)
   lb a1, (a0)
-  sw a1, (sp)
+  sd a1, (sp)
   NEXT
 
   /* Are these supposed to preserve the addresses? */
   defcode "C@C!",4,,CCOPY,FETCHBYTE
-  lw a0, (sp) // source addr
-  lw a1, 8(sp) // dest addr
+  ld a0, (sp) // source addr
+  ld a1, 8(sp) // dest addr
   mv a2, zero
   lb a2, (a0) // byte to copy
   sb a2, (a1)
   addi a0, a0, 1 // Increment dest addr
   addi a1, a1, 1 // Increment source addr
-  sw a0, (sp)
-  sw a1, 8(sp)
+  sd a0, (sp)
+  sd a1, 8(sp)
   NEXT
 
   defcode "CMOVE",5,,CMOVE,CCOPY
-  lw a0, (sp)   // length
-  lw a1, 8(sp)  // dest
-  lw a2, 16(sp) // src
+  ld a0, (sp)   // length
+  ld a1, 8(sp)  // dest
+  ld a2, 16(sp) // src
 1:
   mv a3, zero
   lb a3, (a2)
@@ -497,7 +497,7 @@ code_\label:
   .macro defvar name, namelen, flags=0, label, prev, initial=0
   defcode \name,\namelen,\flags,\label,\prev
   la t0, var_\name
-  sw t0, (sp)
+  sd t0, (sp)
   addi sp, sp, -8
   NEXT
   .data
@@ -529,7 +529,7 @@ var_\name:
   .macro defconst name, namelen, flags=0, label, value, prev
   defcode \name,\namelen,\flags,\label,\prev
   li t0, \value
-  sw t0, (sp)
+  sd t0, (sp)
   addi sp, sp, -8
   NEXT
   .endm
@@ -537,7 +537,7 @@ var_\name:
   .macro defconst_addr name, namelen, flags=0, label, value, prev
   defcode \name,\namelen,\flags,\label,\prev
   la t0, \value
-  sw t0, (sp)
+  sd t0, (sp)
   addi sp, sp, -8
   NEXT
   .endm
@@ -576,24 +576,24 @@ var_\name:
   */
 
   defcode ">R",2,,TOR,__O_NONBLOCK
-  lw a0, (sp)
+  ld a0, (sp)
   addi sp, sp, 8
   PUSHRSP a0
   NEXT
 
   defcode "R<",2,,FROMR,TOR
   POPRSP a0
-  sw a0, (sp)
+  sd a0, (sp)
   addi sp, sp, -8
   NEXT
 
   defcode "RSP@",4,,RSPFETCH,FROMR
-  sw fp, (sp)
+  sd fp, (sp)
   addi sp, sp, -8
   NEXT
 
   defcode "RSP!",4,,RSPSTORE,RSPFETCH
-  lw fp, (sp)
+  ld fp, (sp)
   addi sp, sp, 8
   NEXT
 
@@ -609,14 +609,14 @@ var_\name:
   /* This just pushes the next availlable spot on the parameter stack??? */
   defcode "DSP@",4,,DSPFETCH,RDROP 
   mv sp, a0
-  sw a0, (sp)
+  sd a0, (sp)
   addi sp, sp, -8
   NEXT
 
   /* Replaces the current parameter stack with whatever's on the top
 	of the parameter stack. */
   defcode "DSP!",4,,DSPSTORE,DSPFETCH
-  lw sp, (sp)
+  ld sp, (sp)
   NEXT
 
   /*
@@ -689,7 +689,7 @@ bufftop:
   /* We expect the return value to be on... a0? */
   defcode "KEY",3,,KEY,DSPSTORE
   call _KEY
-  sw a0, (sp)
+  sd a0, (sp)
   addi sp, sp, -8
   NEXT
 
@@ -701,7 +701,7 @@ bufftop:
 */
 _KEY:
   la a1, serial_port_addr // Load address of variable containing address of serial port.
-  lw a1, (a1)                 // Load serial port's address.
+  ld a1, (a1)                 // Load serial port's address.
   /* Need to check read to receive? */
   mv a0, zero
   lb a0, (a1)                 // Fetch byte from recv buffer. Offset is 0.
@@ -710,22 +710,22 @@ _KEY:
 
   /* Only 1 param, the byte to write. Unlike the original Jonesforth. */
   defcode "EMIT",4,,EMIT,KEY
-  lw a0, (sp)
+  ld a0, (sp)
   addi sp, sp, 8
   call _EMIT
   NEXT
 
 _EMIT:
   la a1, serial_port_addr
-  lw a1, (a1)
+  ld a1, (a1)
   sb a0, (a1) /* Store the byte to the recv/transmit buffer */
   ret
 
   /* WORD reads the next full word of input as a string. */
   defcode "WORD",4,,WORD,EMIT
   call _WORD
-  sw a0,  (sp)  /* Base address of buffer */
-  sw a1, 8(sp)  /* Length of read word */
+  sd a0,  (sp)  /* Base address of buffer */
+  sd a1, 8(sp)  /* Length of read word */
   addi sp, sp, -16
   NEXT
 
@@ -746,7 +746,7 @@ _WORD:
   /* Search for the end of the word, storing characters as we go. */
   la a2, word_buffer
 2:
-  sw a0, (a2)
+  sd a0, (a2)
   addi a2, a2, 8 /* Increment the buffer position. */
   call _KEY
   li a1, ' '
@@ -775,11 +775,11 @@ word_buffer:
 	characters (thus 0 indicates success), and second is the parsed
 	number itself, or a partial value. */
   defcode "NUMBER",6,,NUMBER,WORD
-  lw a0, (sp) /* Length of string */
-  lw a1, 8(sp) /* Base address */
+  ld a0, (sp) /* Length of string */
+  ld a1, 8(sp) /* Base address */
   call _NUMBER
-  sw a0, 8(sp) /* Number of unparsed characters */
-  sw a2, (sp) /* Parsed number ends up on top of stack */
+  sd a0, 8(sp) /* Number of unparsed characters */
+  sd a2, (sp) /* Parsed number ends up on top of stack */
   NEXT
 
   /* Basic strategy:
@@ -853,10 +853,10 @@ number_done:
 	word indicated by a string. */
 
   defcode "FIND",4,,FIND,NUMBER
-  lw a0, (sp)  /* Length of string */
-  lw a1, 8(sp) /* Address of string */
+  ld a0, (sp)  /* Length of string */
+  ld a1, 8(sp) /* Address of string */
   call _FIND
-  sw a2, 8(sp)
+  sd a2, 8(sp)
   addi sp, sp, 8
   NEXT
 
@@ -918,7 +918,7 @@ next_character:
   mv a2, t0
   ret
 
-  /* The LINK pointer (in our case, var_\LAST) is always at the
+  /* The LINK pointer (in our case, var_\LAST) is aldays at the
 	beginning of the definition. That is, at 0x5000, the definition for
 	DUP or whatever:
 
@@ -928,7 +928,7 @@ next_character:
 
   */
 next_word:
-  lw t0, (t0)
+  ld t0, (t0)
   j find_loop
 
 not_found:
@@ -939,9 +939,9 @@ not_found:
 	defition and gets the actual executable part of the word, the
 	codeword. */
   defcode ">CFA",4,,TCFA,FIND
-  lw a0, (sp) /* The pointer to the beginning of the definition */
+  ld a0, (sp) /* The pointer to the beginning of the definition */
   call _TCFA
-  sw a0, (sp)
+  sd a0, (sp)
   NEXT
 
   /* If you lb into a register does it clear the upper bits? */
@@ -1028,8 +1028,8 @@ _TCFA:
   defcode "CREATE",6,,CREATE,TDFA
 
   // Get name length and address
-  lw a0, (sp)  // length
-  lw a1, 8(sp) // address of name
+  ld a0, (sp)  // length
+  ld a1, 8(sp) // address of name
   addi sp, sp, 16
 
   /*
@@ -1049,16 +1049,16 @@ _TCFA:
   /* Need to get whatever the LATEST defined word is and start the new
 	word header by writing it at where HERE points */
   la t0, var_LATEST
-  lw t1, (t0)
+  ld t1, (t0)
 
   la t6, var_HERE
-  lw t3, (t6)
+  ld t3, (t6)
   mv t5, t3 /* Copy the _value_ of HERE for later when we update LATEST */
 
   /* Now, store the _value_ of LATEST (a memory address) at the
 	_value_ of HERE (also a memory address)
   */
-  sw t1, (t3)
+  sd t1, (t3)
   /* Increment the _value_ of HERE by 8 (not written-back) */
   addi t3, t3, 8
 
@@ -1083,37 +1083,37 @@ store_chars:
 
   /* Update the _value_ of LATEST with what HERE was when we started,
 	as it is now the LINK pointer to the most recently-defined word. */
-  sw t5, (t0)
+  sd t5, (t0)
   /* Now, write back the _value_ of HERE. */
-  sw t3, (t6)
+  sd t3, (t6)
   NEXT
 
   /* We need to define another word, COMMA, which appends a
 	word-length integer to wherever HERE points. */
   defcode ",",1,,COMMA,CREATE
-  lw a0, (sp)
+  ld a0, (sp)
   addi sp, sp, 8
   call _COMMA
   NEXT
 
 _COMMA:
   la t0, var_HERE
-  lw t1, (t0)
-  sw a0, (t1) // Store the word
+  ld t1, (t0)
+  sd a0, (t1) // Store the word
   addi t1, t1, 8  // Increment and
-  sw t1, (t0)     // update HERE
+  sd t1, (t0)     // update HERE
   ret
 
   /* We need to define some words that change the compiler state. */
   defcode "[",1,F_IMMED,LBRAC,COMMA
   la t0, var_STATE
-  sw zero, (t0) // Set STATE to 0.
+  sd zero, (t0) // Set STATE to 0.
   NEXT
 
   defcode "]",1,,RBRAC,LBRAC
   la t0, var_STATE
   li t1, 1
-  sw t1, (t0) // Set STATE to 1.
+  sd t1, (t0) // Set STATE to 1.
   NEXT
 
 
@@ -1121,7 +1121,7 @@ _COMMA:
       LATEST @ HIDDEN
   */
   defcode "HIDDEN",6,,HIDDEN,RBRAC
-  lw a0, (sp)
+  ld a0, (sp)
   addi sp, sp, 8
   addi a0, a0, 8 // Skip to the name/flags byte
   mv t0, zero
@@ -1133,7 +1133,7 @@ _COMMA:
   /* IMMEDIATE toggles the immediate flag of the most recently-defined word. */
   defcode "IMMEDIATE",9,F_IMMED,IMMEDIATE,HIDDEN
   la t0, var_LATEST // Load the _address_ of LATEST
-  lw t1, (t0)       // Load the _value_ of LATEST
+  ld t1, (t0)       // Load the _value_ of LATEST
   addi t1, t1, 8    // Skip to the name/flags byte.
   mv t2, zero
   lb t2, (t1)
@@ -1164,31 +1164,31 @@ _COMMA:
   .word EXIT
 
   defcode "'",1,,TICK,HIDE
-  lw t0, (gp)
+  ld t0, (gp)
   addi gp, gp, 8
-  sw t0, (sp)
+  sd t0, (sp)
   addi sp, sp, -8
   NEXT
 
   defcode "BRANCH",6,,BRANCH,TICK
-  lw t0, (gp)
+  ld t0, (gp)
   add gp, gp, t0
   NEXT
 
   defcode "0BRANCH",7,,ZBRANCH,BRANCH
-  lw a0, (sp)
+  ld a0, (sp)
   addi sp, sp, -8
   beqz a0, code_BRANCH
   addi gp, gp, 8
   NEXT
 
   defcode "LITSTRING",9,,LITSTRING,ZBRANCH
-  lw a0, (gp)     // Get the length of the string
+  ld a0, (gp)     // Get the length of the string
   addi gp, gp, 8  // Move gp forward
-  lw a1, (gp)
+  ld a1, (gp)
 
-  sw a1, (sp)
-  sw a2, -8(sp)
+  sd a1, (sp)
+  sd a2, -8(sp)
   addi sp, sp, -16
 
   add gp, gp, a0  // Skip the literal string
@@ -1197,15 +1197,15 @@ _COMMA:
   NEXT
 
   defcode "TELL",4,,TELL,LITSTRING
-  lw a0, (sp)  // length of string
-  lw a1, 8(sp) // address of string
+  ld a0, (sp)  // length of string
+  ld a1, 8(sp) // address of string
   addi sp, sp, 16
   call _TELL
   NEXT
 
 _TELL:
   la t0, serial_port_addr /* _address_ of the serial_port_addr variable */
-  lw t0, (t0)             /* _value_ of the serial_port_addr variable (also an address) */
+  ld t0, (t0)             /* _value_ of the serial_port_addr variable (also an address) */
   mv t1, zero
 write_char_loop:
   lb t1, (a1)
@@ -1228,7 +1228,7 @@ write_char_loop:
   mv t0, zero
   la t1, interpret_is_lit
   li t2, 0
-  sw t2, (t1)
+  sd t2, (t1)
   mv a5, a0
   mv a6, a1
   call _FIND // a2 contains either 0 or the address of the found word
@@ -1248,7 +1248,7 @@ not_in_dict: // 1
   /* Set variable indicating lit */
   li t4, 1
   la t1, interpret_is_lit
-  sw t4, (t1)
+  sd t4, (t1)
 
   /*  We assume its a number at this point
       Restore a0, a1 for _NUMBER
@@ -1262,13 +1262,13 @@ not_in_dict: // 1
 
 compile_execute_p: // 2
   la a5, var_STATE
-  lw a5, (a5)
+  ld a5, (a5)
   beqz a5, executing
 
   /* Compiling. Just append the word  */
   call _COMMA
   la a4, interpret_is_lit // Check if we are compiling a literal
-  lw a4, (a4)
+  ld a4, (a4)
   beqz a4, next_terminus  // If we are compiling lit, we need to also append the number.
   mv a0, a1
   call _COMMA
@@ -1279,14 +1279,14 @@ next_terminus:
 executing: // 4
   // Check if we are interpreting lit
   la a5, interpret_is_lit
-  lw a5, (a5)
+  ld a5, (a5)
   bnez a5, execute_literal
 
   // Not a literal, execute it now
   jalr zero, (a0)
 
 execute_literal: // 5
-  sw a1, (sp)
+  sd a1, (sp)
   addi sp, sp, -8
   NEXT
 

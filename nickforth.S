@@ -63,12 +63,14 @@ name_0:
 DOCOL:
   PUSHRSP gp
   addi gp, t0, 8
+  NEXT
 
   /* Assembler entry point. */
   .text
   .globl _start
 _start:
   la fp, return_stack_top
+  la sp, data_stack_top
   /* call set_up_data_segment */
 
   la gp, cold_start
@@ -76,7 +78,7 @@ _start:
 
   .section .rodata
 cold_start:
-  .word QUIT
+  .dword QUIT
 
   /* Flags */
   .set F_IMMED,   0x80 /* Bits 3 and 2 ?? */
@@ -89,13 +91,13 @@ cold_start:
   .align 3
   .globl name_\label
 name_\label:
-  .int name_\lastlink
+  .dword name_\lastlink
   .byte \flags+\namelen
   .ascii "\name"
   .align 3
   .globl \label
 \label:
-  .int DOCOL
+  .dword DOCOL
   /* Word pointers follow below */
   .endm
 
@@ -105,13 +107,13 @@ name_\label:
   .align 3
   .globl name_\label
 name_\label:
-  .int name_\lastlink
+  .dword name_\lastlink
   .byte \flags+\namelen
   .ascii "\name"
   .align 3
   .globl \label
 \label:
-  .int code_\label
+  .dword code_\label
   .text
   /* Align 8??? */
   .globl code_\label
@@ -537,8 +539,8 @@ var_\name:
   .macro defconst_addr name, namelen, flags=0, label, value, prev
   defcode \name,\namelen,\flags,\label,\prev
   la t0, \value
-  sd t0, (sp)
   addi sp, sp, -8
+  sd t0, (sp)
   NEXT
   .endm
 
@@ -583,13 +585,13 @@ var_\name:
 
   defcode "R<",2,,FROMR,TOR
   POPRSP a0
-  sd a0, (sp)
   addi sp, sp, -8
+  sd a0, (sp)
   NEXT
 
   defcode "RSP@",4,,RSPFETCH,FROMR
-  sd fp, (sp)
   addi sp, sp, -8
+  sd fp, (sp)
   NEXT
 
   defcode "RSP!",4,,RSPSTORE,RSPFETCH
@@ -704,7 +706,7 @@ _KEY:
   ld a1, (a1)                 // Load serial port's address.
   /* Need to check read to receive? */
   mv a0, zero
-  lb a0, (a1)                 // Fetch byte from recv buffer. Offset is 0.
+  lbu a0, (a1)                 // Fetch byte from recv buffer. Offset is 0.
   /* Need to put the fetched byte into a0 */
   ret
 
@@ -959,10 +961,10 @@ _TCFA:
 
   /* And also we will have a >DFA, which converts the DEA (dictionary entry address) to the data field address (DFA). */
   defword ">DFA",4,,TDFA,TCFA
-  .word TCFA
-  .word INCR4
-  .word INCR4
-  .word EXIT
+  .dword TCFA
+  .dword INCR4
+  .dword INCR4
+  .dword EXIT
 
   /* Now for compiling. We have to solve some problems:
       1. Where do new words go?
@@ -1143,25 +1145,25 @@ _COMMA:
 
   /* And now, we can define COLON using CREATE (and these other words.) */
   defword ":",1,,COLON,IMMEDIATE
-  .word WORD                  // Get the name of the new word
-  .word CREATE                // Create the header
-  .word LIT, DOCOL, COMMA     // Append docol
-  .word LATEST, FETCH, HIDDEN // Fetch the latest word, make it hidden
-  .word RBRAC                 // Compile mode
-  .word EXIT                  // Return from function.
+  .dword WORD                  // Get the name of the new word
+  .dword CREATE                // Create the header
+  .dword LIT, DOCOL, COMMA     // Append docol
+  .dword LATEST, FETCH, HIDDEN // Fetch the latest word, make it hidden
+  .dword RBRAC                 // Compile mode
+  .dword EXIT                  // Return from function.
 
   /* SEMICOLON is also simple. */
   defword ";",1,F_IMMED,SEMICOLON,COLON
-  .word LIT, EXIT, COMMA        // Append EXIT
-  .word LATEST, FETCH, HIDDEN   // Toggle hidden flag to make it unhidden
-  .word LBRAC                   // Go back to immediate mode
-  .word EXIT
+  .dword LIT, EXIT, COMMA        // Append EXIT
+  .dword LATEST, FETCH, HIDDEN   // Toggle hidden flag to make it unhidden
+  .dword LBRAC                   // Go back to immediate mode
+  .dword EXIT
 
   defword "HIDE",4,,HIDE,SEMICOLON
-  .word WORD      // Get the word
-  .word FIND      // Find that word
-  .word HIDDEN    // Set it to hidden
-  .word EXIT
+  .dword WORD      // Get the word
+  .dword FIND      // Find that word
+  .dword HIDDEN    // Set it to hidden
+  .dword EXIT
 
   defcode "'",1,,TICK,HIDE
   ld t0, (gp)
@@ -1217,9 +1219,9 @@ write_char_loop:
   ret
 
   defword "QUIT",4,,QUIT,TELL
-  .word RZ,RSPSTORE // R0 RSP!, clear the return stack
-  .word INTERPRET   // interpret the next word
-  .word BRANCH,-16  // and loop forever
+  .dword RZ,RSPSTORE // R0 RSP!, clear the return stack
+  .dword INTERPRET   // interpret the next word
+  .dword BRANCH,-16  // and loop forever
 
   /* There is no way this is correct. Need to graph this out */
   defcode "INTERPRET",9,,INTERPRET,QUIT
@@ -1298,23 +1300,20 @@ interpret_is_lit:
   .int 0
 
 serial_port_addr:
-  .word 0x0
+  .dword 0x10000000
 
-  .text
   .set INITIAL_DATA_SEGMENT_SIZE,65536
-set_up_data_segment:
-  /* Actually set this up somehow. */
-
-  
-
 	.set RETURN_STACK_SIZE,8192
 
 	.bss
+  .space INITIAL_DATA_SEGMENT_SIZE
+  .globl data_stack_top
+data_stack_top: 
 /* Forth return stack */
   .align 12
 return_stack:
   .space RETURN_STACK_SIZE
   .globl return_stack_top
 return_stack_top:
-  .word 0x0
+  .dword 0x0
   .align 12

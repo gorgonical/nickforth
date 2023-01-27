@@ -878,8 +878,8 @@ number_done:
 	word indicated by a string. */
 
   defcode "FIND",4,,FIND,NUMBER
-  ld a0, (sp)  /* Length of string */
-  ld a1, 8(sp) /* Address of string */
+  ld a1, (sp)  /* Length of string */
+  ld a0, 8(sp) /* Address of string */
   SAVECALL _FIND
   sd a2, 8(sp)
   addi sp, sp, 8
@@ -911,20 +911,21 @@ name_A: [0x1000]
   */
 _FIND:
   la t0, var_LATEST
+  ld t0, (t0)
 find_loop:
   beqz t0, not_found
   mv t1, zero
   lb t1, 8(t0) /* Offset of 8 to index len+flags byte because we use 64-bit words for addresses */
   li t2, F_LENMASK|F_HIDDEN
-  or t1, t1, t2
-  sub t1, t1, a0
+  and t1, t1, t2
+  sub t1, t1, a1
   bnez t1, next_word /* If the lengths don't match or hidden is set, go on to the next word. */
 
   /* Compare strings more carefully, starting from the first byte. */
   mv t1, t0
   addi t1, t1, 9
-  mv t2, a1
-  mv t6, a0 /* Copy length also */
+  mv t2, a0
+  mv t6, a1 /* Copy length also */
 next_character:
   mv t3, zero
   mv t4, zero

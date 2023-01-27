@@ -1322,6 +1322,7 @@ parse_error: // 6
 interpret_is_lit:
   .int 0
 
+  .align 8
 serial_port_addr:
   .dword 0x10000000
 

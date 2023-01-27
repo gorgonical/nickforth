@@ -108,6 +108,8 @@ name_\label:
   /* Word pointers follow below */
   .endm
 
+  .set name_ZERO,0
+  
 /* Assembler macro that eases defining words in assembly */
   .macro defcode name, namelen, flags=0, label, lastlink=0
   .section .rodata
@@ -131,7 +133,7 @@ code_\label:
   We use the regular sp for the parameter stack.
 */
 
-  defcode "DROP",4,,DROP,0
+  defcode "DROP",4,,DROP,ZERO
   addi sp, sp, 8
   NEXT
 
@@ -527,7 +529,7 @@ var_\name:
 
   defvar "STATE",5,,STATE,CMOVE
   defvar "HERE",4,,HERE,STATE
-  defvar "LATEST",6,,LATEST,HERE,0 /* Stand-in value */
+  defvar "LATEST",6,,LATEST,HERE,name_INTERPRET
   defvar "S0",2,,S0,LATEST
   defvar "BASE",4,,BASE,S0,10
 

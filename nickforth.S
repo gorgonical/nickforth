@@ -422,8 +422,8 @@ code_\label:
   defcode "LIT",3,,LIT,EXIT
   ld a0, (gp)
   addi gp, gp, 8
-  sd a0, (sp)
   addi sp, sp, 8
+  sd a0, (sp)
   NEXT
 
   /* Here are all the memory manipulation words. */
@@ -978,9 +978,9 @@ _TCFA:
   and t0, t0, t1 /* Mask to get the length. */
   add t1, a0, 9 /* Point to the name */
   add t1, t1, t0 /* Skip the length of the name */
-  /* Byte-align (4? 8?) */
-  addi t1, t1, 3
-  and  a0, t1, ~3
+  /* 8-byte align */
+  addi t1, t1, 7
+  and  a0, t1, ~7
   ret
 
   /* And also we will have a >DFA, which converts the DEA (dictionary entry address) to the data field address (DFA). */
@@ -1309,11 +1309,12 @@ executing: // 4
   bnez a5, execute_literal
 
   // Not a literal, execute it now
+  ld a0, (a0)
   jalr zero, (a0)
 
 execute_literal: // 5
-  sd a1, (sp)
   addi sp, sp, -8
+  sd a1, (sp)
   NEXT
 
 parse_error: // 6

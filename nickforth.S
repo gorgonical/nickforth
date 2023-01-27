@@ -52,6 +52,12 @@
   addi fp, fp, 8
   .endm
 
+  .macro SAVECALL label
+  PUSHRSP ra
+  call \label
+  POPRSP ra
+  .endm
+
   .text
   .align 3
 
@@ -74,6 +80,7 @@ _start:
   /* call set_up_data_segment */
 
   la gp, cold_start
+
   NEXT
 
   .section .rodata
@@ -690,7 +697,7 @@ bufftop:
 
   /* We expect the return value to be on... a0? */
   defcode "KEY",3,,KEY,DSPSTORE
-  call _KEY
+  SAVECALL _KEY
   sd a0, (sp)
   addi sp, sp, -8
   NEXT
@@ -705,16 +712,28 @@ _KEY:
   la a1, serial_port_addr // Load address of variable containing address of serial port.
   ld a1, (a1)                 // Load serial port's address.
   /* Need to check read to receive? */
+
+  /* Until byte is ready, keep looping. If KEY is called and there are
+	no bytes available, the intention is to loop forever. */
+//key_loop:
+//  mv t1, zero
+//  lbu t1, 4(a1) /* Line status register offset is 0x4 */
+//  and t1, t1, 1 /* Data ready bit is bit 0 */
+//  beqz t1, key_loop
+
+key_loop:
   mv a0, zero
   lbu a0, (a1)                 // Fetch byte from recv buffer. Offset is 0.
   /* Need to put the fetched byte into a0 */
+  beqz a0, key_loop
+  sb a0, (a1)
   ret
 
   /* Only 1 param, the byte to write. Unlike the original Jonesforth. */
   defcode "EMIT",4,,EMIT,KEY
   ld a0, (sp)
   addi sp, sp, 8
-  call _EMIT
+  SAVECALL _EMIT
   NEXT
 
 _EMIT:
@@ -725,7 +744,7 @@ _EMIT:
 
   /* WORD reads the next full word of input as a string. */
   defcode "WORD",4,,WORD,EMIT
-  call _WORD
+  SAVECALL _WORD
   sd a0,  (sp)  /* Base address of buffer */
   sd a1, 8(sp)  /* Length of read word */
   addi sp, sp, -16
@@ -735,7 +754,7 @@ _WORD:
 
   /* Search for first non-blank character. Also skip \ comments. */
 1:
-  call _KEY /* Next key is now in a0 */
+  SAVECALL _KEY /* Next key is now in a0 */
   li a2, '\\'
   sub a2, a0, a2
   /* If key == \ */
@@ -748,12 +767,12 @@ _WORD:
   /* Search for the end of the word, storing characters as we go. */
   la a2, word_buffer
 2:
-  sd a0, (a2)
-  addi a2, a2, 8 /* Increment the buffer position. */
-  call _KEY
+  sb a0, (a2)
+  addi a2, a2, 1 /* Increment the buffer position. */
+  SAVECALL _KEY
   li a1, ' '
-  sub a1, a0, a1 /* Is it blank? */
-  beqz a1, 1b    /* If so, keep looking. */
+  sub a1, a0, a1 /* Is it blank? If not, keep reading */
+  bnez a1, 2b
 
   /* Return the word (the static buffer) and its length */
   la a0, word_buffer
@@ -762,7 +781,7 @@ _WORD:
 
   /* Code to skip \ comments to end of the current line. */
 3:
-  call _KEY /* Get next character */
+  SAVECALL _KEY /* Get next character */
   li a1, '\n'
   sub a1, a0, a1
   beqz a1, 3b /* If it's not the end of the line, go back. */
@@ -779,7 +798,7 @@ word_buffer:
   defcode "NUMBER",6,,NUMBER,WORD
   ld a0, (sp) /* Length of string */
   ld a1, 8(sp) /* Base address */
-  call _NUMBER
+  SAVECALL _NUMBER
   sd a0, 8(sp) /* Number of unparsed characters */
   sd a2, (sp) /* Parsed number ends up on top of stack */
   NEXT
@@ -798,14 +817,16 @@ _NUMBER:
 
   /* We parse numbers according to the variable BASE */
   la t6, var_BASE
+  lw t6, (t6)
 
   /* Check if the first character is a -. If it isn't, jump ahead. */
   lb t0, (a1)
-  addi a1, a1, 1
   li t1, '-'
   sub t3, t0, t1 /* If t3 == 0, then the first character was negative. */
-  addi a0, a0, -1
-  bnez a0, digit_read_loop
+  bnez t3, digit_read_loop /* If t3 != '-', jump to the parse loop. */
+  addi a1, a1, 1 /* If the first byte is '-' then we need to advance the byte... */
+  addi a0, a0, -1 /* And decrement how many bytes to read. */
+  bnez a0, digit_read_loop /* If any characters left, jump to read loop. */
 
   /* String is only '-' */
   li a2, 0
@@ -822,23 +843,23 @@ convert_digit:
   /* If the digit is less than '0' it is out of range. */
   addi t1, t0, -'0'
   bltz t1, need_negate
-  /* Now <=0, check <= 9 */
-  addi t1, t0, -'9'
-  blez t1, got_digit
+  /* Now the digit is <=0, now check >= 9 */
+  addi t2, t0, -'9'
+  blez t2, got_digit /* t1 now contains the digit that's 0 <= x <= 9 */
   /* Now this part checks for hex. We know it's > 9 and > 0. */
-  addi t1, t0, -'A'
-  bltz t1, need_negate
+  addi t1, t0, -'A' /* Convert t0 to digit from hex */
+  bltz t1, need_negate /* Error? */
   /* Otherwise 10 to convert from hex. */
   addi t1, t1, 10
   /* Fall through to got_digit */
 
 got_digit:
   /* If digit >= base, error */
-  sub t1, t0, t6
-  beqz t1, need_negate
+  sub t2, t1, t6
+  bgez t2, need_negate
 
   /* Otherwise it's fine, so add to a2 and go again */
-  add a2, a2, t0
+  add a2, a2, t1
   addi a0, a0, -1
   bnez a0, digit_read_loop
 
@@ -857,7 +878,7 @@ number_done:
   defcode "FIND",4,,FIND,NUMBER
   ld a0, (sp)  /* Length of string */
   ld a1, 8(sp) /* Address of string */
-  call _FIND
+  SAVECALL _FIND
   sd a2, 8(sp)
   addi sp, sp, 8
   NEXT
@@ -942,7 +963,7 @@ not_found:
 	codeword. */
   defcode ">CFA",4,,TCFA,FIND
   ld a0, (sp) /* The pointer to the beginning of the definition */
-  call _TCFA
+  SAVECALL _TCFA
   sd a0, (sp)
   NEXT
 
@@ -1095,7 +1116,7 @@ store_chars:
   defcode ",",1,,COMMA,CREATE
   ld a0, (sp)
   addi sp, sp, 8
-  call _COMMA
+  SAVECALL _COMMA
   NEXT
 
 _COMMA:
@@ -1202,7 +1223,7 @@ _COMMA:
   ld a0, (sp)  // length of string
   ld a1, 8(sp) // address of string
   addi sp, sp, 16
-  call _TELL
+  SAVECALL _TELL
   NEXT
 
 _TELL:
@@ -1225,7 +1246,7 @@ write_char_loop:
 
   /* There is no way this is correct. Need to graph this out */
   defcode "INTERPRET",9,,INTERPRET,QUIT
-  call _WORD // a0 base address, a1 length
+  SAVECALL _WORD // a0 base address, a1 length
 
   mv t0, zero
   la t1, interpret_is_lit
@@ -1233,14 +1254,14 @@ write_char_loop:
   sd t2, (t1)
   mv a5, a0
   mv a6, a1
-  call _FIND // a2 contains either 0 or the address of the found word
+  SAVECALL _FIND // a2 contains either 0 or the address of the found word
   beqz a2, not_in_dict
 
   /* If we don't jump, it is in the dictionary. Is it IMMEDIATE? */
   mv t3, zero
   lb t3, 8(a2) // Get name+flags
   mv a0, a2 // set up for _TCFA
-  call _TCFA // codeword pointer now in a0
+  SAVECALL _TCFA // codeword pointer now in a0
   li t6, F_IMMED
   and t4, t3, t6
   bnez t4, executing // If immediate, go straight to execution
@@ -1255,9 +1276,9 @@ not_in_dict: // 1
   /*  We assume its a number at this point
       Restore a0, a1 for _NUMBER
   */
-  mv a0, a5
-  mv a1, a6
-  call _NUMBER // a0 is unparsed characters or 0 on no-len, a2 is parsed number
+  mv a0, a6
+  mv a1, a5
+  SAVECALL _NUMBER // a0 is unparsed characters or 0 on no-len, a2 is parsed number
   bnez a0, parse_error
   la a0, LIT // Prepare to run LIT with the word.
   mv a1, a2
@@ -1268,12 +1289,12 @@ compile_execute_p: // 2
   beqz a5, executing
 
   /* Compiling. Just append the word  */
-  call _COMMA
+  SAVECALL _COMMA
   la a4, interpret_is_lit // Check if we are compiling a literal
   ld a4, (a4)
   beqz a4, next_terminus  // If we are compiling lit, we need to also append the number.
   mv a0, a1
-  call _COMMA
+  SAVECALL _COMMA
 
 next_terminus:
   NEXT

@@ -76,8 +76,10 @@ DOCOL:
   .globl _start
 _start:
   la fp, return_stack_top
-  la sp, data_stack_top
-  /* call set_up_data_segment */
+  la sp, param_stack_top
+  la t0, var_HERE
+  la t1, data_segment_start
+  sd t1, (t0)
 
   la gp, cold_start
 
@@ -422,7 +424,7 @@ code_\label:
   defcode "LIT",3,,LIT,EXIT
   ld a0, (gp)
   addi gp, gp, 8
-  addi sp, sp, 8
+  addi sp, sp, -8
   sd a0, (sp)
   NEXT
 
@@ -508,11 +510,11 @@ code_\label:
   .macro defvar name, namelen, flags=0, label, prev, initial=0
   defcode \name,\namelen,\flags,\label,\prev
   la t0, var_\name
-  sd t0, (sp)
   addi sp, sp, -8
+  sd t0, (sp)
   NEXT
   .data
-  .align 2
+  .align 3
 var_\name:
   .int \initial
   .endm
@@ -700,8 +702,8 @@ bufftop:
   /* We expect the return value to be on... a0? */
   defcode "KEY",3,,KEY,DSPSTORE
   SAVECALL _KEY
-  sd a0, (sp)
   addi sp, sp, -8
+  sd a0, (sp)
   NEXT
 
   /* What does key need to do? It needs to take the next byte from
@@ -747,9 +749,9 @@ _EMIT:
   /* WORD reads the next full word of input as a string. */
   defcode "WORD",4,,WORD,EMIT
   SAVECALL _WORD
-  sd a0,  (sp)  /* Base address of buffer */
-  sd a1, 8(sp)  /* Length of read word */
   addi sp, sp, -16
+  sd a1, 8(sp)  /* Base address of buffer */
+  sd a0,  (sp)  /* Length of read word */   
   NEXT
 
 _WORD:
@@ -777,8 +779,8 @@ _WORD:
   bnez a1, 2b
 
   /* Return the word (the static buffer) and its length */
-  la a0, word_buffer
-  sub a1, a2, a0 /* a1 now contains the length in bytes. */
+  la a1, word_buffer
+  sub a0, a2, a1 /* a1 now contains the length in bytes. */
   ret
 
   /* Code to skip \ comments to end of the current line. */
@@ -878,11 +880,11 @@ number_done:
 	word indicated by a string. */
 
   defcode "FIND",4,,FIND,NUMBER
-  ld a1, (sp)  /* Length of string */
-  ld a0, 8(sp) /* Address of string */
+  ld a0, (sp)  /* Length of string */ // change to a0 
+  ld a1, 8(sp) /* Address of string */// change to a1
   SAVECALL _FIND
-  sd a2, 8(sp)
   addi sp, sp, 8
+  sd a2, (sp)
   NEXT
 
   /*
@@ -918,14 +920,14 @@ find_loop:
   lb t1, 8(t0) /* Offset of 8 to index len+flags byte because we use 64-bit words for addresses */
   li t2, F_LENMASK|F_HIDDEN
   and t1, t1, t2
-  sub t1, t1, a1
+  sub t1, t1, a0
   bnez t1, next_word /* If the lengths don't match or hidden is set, go on to the next word. */
 
   /* Compare strings more carefully, starting from the first byte. */
   mv t1, t0
   addi t1, t1, 9
-  mv t2, a0
-  mv t6, a1 /* Copy length also */
+  mv t2, a1
+  mv t6, a0 /* Copy length also */
 next_character:
   mv t3, zero
   mv t4, zero
@@ -1249,14 +1251,14 @@ write_char_loop:
 
   /* There is no way this is correct. Need to graph this out */
   defcode "INTERPRET",9,,INTERPRET,QUIT
-  SAVECALL _WORD // a0 base address, a1 length
+  SAVECALL _WORD // a1 base address, a0 length
 
   mv t0, zero
   la t1, interpret_is_lit
   li t2, 0
   sd t2, (t1)
-  mv a5, a0
-  mv a6, a1
+  mv a5, a0 // length
+  mv a6, a1 // base addr
   SAVECALL _FIND // a2 contains either 0 or the address of the found word
   beqz a2, not_in_dict
 
@@ -1279,8 +1281,8 @@ not_in_dict: // 1
   /*  We assume its a number at this point
       Restore a0, a1 for _NUMBER
   */
-  mv a0, a6
-  mv a1, a5
+  mv a0, a5
+  mv a1, a6
   SAVECALL _NUMBER // a0 is unparsed characters or 0 on no-len, a2 is parsed number
   bnez a0, parse_error
   la a0, LIT // Prepare to run LIT with the word.
@@ -1309,8 +1311,9 @@ executing: // 4
   bnez a5, execute_literal
 
   // Not a literal, execute it now
-  ld a0, (a0)
-  jalr zero, (a0)
+  mv t0, a0
+  ld t1, (t0)
+  jr t1
 
 execute_literal: // 5
   addi sp, sp, -8
@@ -1329,17 +1332,27 @@ serial_port_addr:
   .dword 0x10000000
 
   .set INITIAL_DATA_SEGMENT_SIZE,65536
+  .set INITIAL_PARAM_STACK_SIZE,65536
 	.set RETURN_STACK_SIZE,8192
 
 	.bss
-  .space INITIAL_DATA_SEGMENT_SIZE
-  .globl data_stack_top
-data_stack_top: 
-/* Forth return stack */
-  .align 12
+  /* param stack ends here */
+  .space INITIAL_PARAM_STACK_SIZE
+  .global param_stack_top
+param_stack_top:
+  /* param stack starts here */
+
+  /* Forth return stack ends here */
+  .align 12 /* Align to 4096 bytes, page size? */
 return_stack:
   .space RETURN_STACK_SIZE
   .globl return_stack_top
 return_stack_top:
+  /* Forth return stack starts here */
   .dword 0x0
-  .align 12
+
+  .align 12 /* Page aligned */
+  /* The data segment where definitions go */
+  .globl data_segment_start
+data_segment_start:
+  .space INITIAL_DATA_SEGMENT_SIZE

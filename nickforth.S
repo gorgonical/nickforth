@@ -431,10 +431,10 @@ code_\label:
   /* Here are all the memory manipulation words. */
 
   defcode "!",1,,STORE,LIT
-  ld a0, (sp)
-  ld a1, 8(sp)
+  ld a0, (sp)  /* Value to store */
+  ld a1, 8(sp) /* Address to store it at */
   addi sp, sp, 16
-  sd a1, (a0)
+  sd a0, (a1)
   NEXT
 
   defcode "@",1,,FETCH,STORE
@@ -633,6 +633,7 @@ var_\name:
   NEXT
 
   /*
+  From Original Jonesforth:
 
 	The implementation of KEY uses an input buffer of a certain size (defined at the end of this
 	file).  It calls the Linux read(2) system call to fill this buffer and tracks its position
@@ -651,8 +652,6 @@ var_\name:
 		       currkey (next character to read)
 
 	<---------------------- BUFFER_SIZE (4096 bytes) ---------------------->
-
-  From Original Jonesforth:
 
 	defcode "KEY",3,,KEY
 	call _KEY
@@ -719,18 +718,13 @@ _KEY:
 
   /* Until byte is ready, keep looping. If KEY is called and there are
 	no bytes available, the intention is to loop forever. */
-//key_loop:
-//  mv t1, zero
-//  lbu t1, 4(a1) /* Line status register offset is 0x4 */
-//  and t1, t1, 1 /* Data ready bit is bit 0 */
-//  beqz t1, key_loop
 
 key_loop:
   mv a0, zero
   lbu a0, (a1)                 // Fetch byte from recv buffer. Offset is 0.
   /* Need to put the fetched byte into a0 */
   beqz a0, key_loop
-  sb a0, (a1)
+  sb a0, (a1) /* Echo the byte back to the serial port. */
   ret
 
   /* Only 1 param, the byte to write. Unlike the original Jonesforth. */
@@ -751,7 +745,7 @@ _EMIT:
   SAVECALL _WORD
   addi sp, sp, -16
   sd a1, 8(sp)  /* Base address of buffer */
-  sd a0,  (sp)  /* Length of read word */   
+  sd a0,  (sp)  /* Length of read word */
   NEXT
 
 _WORD:
@@ -1106,8 +1100,8 @@ store_chars:
   bnez a0, store_chars
 
   /* Align */
-  addi t3, t3, 3
-  and  t3, t3, ~3
+  addi t3, t3, 7
+  and  t3, t3, ~7
 
   /* Update the _value_ of LATEST with what HERE was when we started,
 	as it is now the LINK pointer to the most recently-defined word. */
@@ -1194,8 +1188,8 @@ _COMMA:
   defcode "'",1,,TICK,HIDE
   ld t0, (gp)
   addi gp, gp, 8
-  sd t0, (sp)
   addi sp, sp, -8
+  sd t0, (sp)
   NEXT
 
   defcode "BRANCH",6,,BRANCH,TICK
@@ -1249,8 +1243,16 @@ write_char_loop:
   .dword INTERPRET   // interpret the next word
   .dword BRANCH,-16  // and loop forever
 
+  defcode "CHAR",4,,CHAR,QUIT
+  SAVECALL _WORD
+  mv t0, zero
+  lbu t0, (a1)
+  addi sp, sp, -8
+  sd t0, (sp)
+  NEXT
+
   /* There is no way this is correct. Need to graph this out */
-  defcode "INTERPRET",9,,INTERPRET,QUIT
+  defcode "INTERPRET",9,,INTERPRET,CHAR
   SAVECALL _WORD // a1 base address, a0 length
 
   mv t0, zero

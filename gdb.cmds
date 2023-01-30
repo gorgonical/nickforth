@@ -1,0 +1,6 @@
+target remote localhost:1234
+b *0x80200000
+b _TCFA
+b _FIND
+b code_INTERPRET
+b code_CREATE

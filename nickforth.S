@@ -759,8 +759,12 @@ _WORD:
   beqz a2, 3f
   /* else if key == ' ' */
   li a2, ' '
+  /* else if key == '\n' */
   sub a2, a0, a2
   blez a2, 1b
+  li a2, '\n'
+  sub a2, a0, a2
+  blez a1, 1b
 
   /* Search for the end of the word, storing characters as we go. */
   la a2, word_buffer

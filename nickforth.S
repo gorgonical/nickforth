@@ -753,15 +753,15 @@ _WORD:
   /* Search for first non-blank character. Also skip \ comments. */
 1:
   SAVECALL _KEY /* Next key is now in a0 */
+  /* If key == \ */
   li a2, '\\'
   sub a2, a0, a2
-  /* If key == \ */
   beqz a2, 3f
   /* else if key == ' ' */
   li a2, ' '
-  /* else if key == '\n' */
   sub a2, a0, a2
   blez a2, 1b
+  /* else if key == '\n' */
   li a2, '\n'
   sub a2, a0, a2
   blez a1, 1b
@@ -772,9 +772,15 @@ _WORD:
   sb a0, (a2)
   addi a2, a2, 1 /* Increment the buffer position. */
   SAVECALL _KEY
+  /* TODO This probably needs to check for either space or newline to find word end */
   li a1, ' '
   sub a1, a0, a1 /* Is it blank? If not, keep reading */
-  bnez a1, 2b
+  beqz a1, end_of_word
+  li a1, '\r'
+  sub a1, a0, a1
+  beqz a1, end_of_word
+  j 2b
+end_of_word:
 
   /* Return the word (the static buffer) and its length */
   la a1, word_buffer
@@ -1028,7 +1034,7 @@ _TCFA:
                 ^
                 | Next byte returned by KEY will be the 'D' character of DUP.
 
-  Then DUP is read, looked up, and appended:
+  Then DUP is rea d, looked up, and appended:
 
                                                 									     +-- HERE updated to point here.
                                                 									     |

@@ -15,3 +15,16 @@ nickforth.bin: nickforth
 
 clean:
 	rm nickforth.bin nickforth
+
+run:
+	./run-qemu.sh
+	rm log.0;
+	screen -d -m  -L -Logfile log.0 /dev/pts/3; sleep 1
+	screen -X readbuf screen.cmd
+	screen -X paste .
+	screen -X quit
+	less log.0
+	pkill qemu
+
+test:
+	./test.sh all

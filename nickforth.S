@@ -83,6 +83,19 @@ _start:
 
   la gp, cold_start
 
+  la t0, serial_port_addr
+  ld t0, (t0)
+  li t1, 'R'
+  sb t1, (t0)
+  li t1, 'E'
+  sb t1, (t0)
+  li t1, 'S'
+  sb t1, (t0)
+  li t1, 'E'
+  sb t1, (t0)
+  li t1, 'T'
+  sb t1, (t0)
+
   NEXT
 
   .section .rodata
@@ -431,10 +444,10 @@ code_\label:
   /* Here are all the memory manipulation words. */
 
   defcode "!",1,,STORE,LIT
-  ld a0, (sp)  /* Value to store */
-  ld a1, 8(sp) /* Address to store it at */
+  ld a0, (sp)  /* Address to store at */
+  ld a1, 8(sp) /* Value to store */
   addi sp, sp, 16
-  sd a0, (a1)
+  sd a1, (a0)
   NEXT
 
   defcode "@",1,,FETCH,STORE
@@ -772,7 +785,6 @@ _WORD:
   sb a0, (a2)
   addi a2, a2, 1 /* Increment the buffer position. */
   SAVECALL _KEY
-  /* TODO This probably needs to check for either space or newline to find word end */
   li a1, ' '
   sub a1, a0, a1 /* Is it blank? If not, keep reading */
   beqz a1, end_of_word
@@ -1195,6 +1207,7 @@ _COMMA:
   .dword HIDDEN    // Set it to hidden
   .dword EXIT
 
+  /* ' Copies the next codeword to the stack */
   defcode "'",1,,TICK,HIDE
   ld t0, (gp)
   addi gp, gp, 8
@@ -1209,7 +1222,7 @@ _COMMA:
 
   defcode "0BRANCH",7,,ZBRANCH,BRANCH
   ld a0, (sp)
-  addi sp, sp, -8
+  addi sp, sp, 8
   beqz a0, code_BRANCH
   addi gp, gp, 8
   NEXT
@@ -1264,6 +1277,7 @@ write_char_loop:
   /* There is no way this is correct. Need to graph this out */
   defcode "INTERPRET",9,,INTERPRET,CHAR
   SAVECALL _WORD // a1 base address, a0 length
+interpret_word: 
 
   mv t0, zero
   la t1, interpret_is_lit
@@ -1272,6 +1286,7 @@ write_char_loop:
   mv a5, a0 // length
   mv a6, a1 // base addr
   SAVECALL _FIND // a2 contains either 0 or the address of the found word
+found_or_not: 
   beqz a2, not_in_dict
 
   /* If we don't jump, it is in the dictionary. Is it IMMEDIATE? */

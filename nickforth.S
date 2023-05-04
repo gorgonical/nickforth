@@ -95,6 +95,8 @@ _start:
   sb t1, (t0)
   li t1, 'T'
   sb t1, (t0)
+  li t1, '\n'
+  sb t1, (t0)
 
   NEXT
 
@@ -287,7 +289,7 @@ code_\label:
   sd a1, (sp)
   NEXT
 
-  defcode "MOD",4,,MOD,DIV
+  defcode "MOD",3,,MOD,DIV
   ld a0, (sp)
   ld a1, 8(sp)
   addi sp, sp, 8
@@ -295,7 +297,17 @@ code_\label:
   sd a1, (sp)
   NEXT
 
-  defcode "=",1,,EQU,MOD
+  defcode "/MOD",4,,DIVMOD,MOD
+  ld a0, (sp) /* Top of stack */
+  ld a1, 8(sp)
+  div a3, a1, a0
+  rem a1, a1, a0
+  sd a3, (sp)
+  sd a1, 8(sp)
+  NEXT
+
+
+  defcode "=",1,,EQU,DIVMOD
   ld a0, (sp)
   ld a1, 8(sp)
   addi sp, sp, 8
@@ -529,7 +541,7 @@ code_\label:
   .data
   .align 3
 var_\name:
-  .int \initial
+  .dword \initial
   .endm
 
   /*

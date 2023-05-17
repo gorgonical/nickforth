@@ -80,6 +80,8 @@ _start:
   la t0, var_HERE
   la t1, data_segment_start
   sd t1, (t0)
+  la t0, var_S0
+  sd sp, (t0)
 
   la gp, cold_start
 
@@ -646,9 +648,9 @@ var_\name:
 
   /* This just pushes the next availlable spot on the parameter stack??? */
   defcode "DSP@",4,,DSPFETCH,RDROP 
-  mv sp, a0
-  sd a0, (sp)
+  mv a0, sp
   addi sp, sp, -8
+  sd a0, (sp)
   NEXT
 
   /* Replaces the current parameter stack with whatever's on the top

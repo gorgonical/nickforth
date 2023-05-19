@@ -1,4 +1,4 @@
- /* -*- tab-width: 2 -*-  */
+/* -*- tab-width: 2 -*-  */
   .set NICK_VERSION,1
 
   /*
@@ -283,31 +283,14 @@ code_\label:
 	single primitive.
 */
 
-  defcode "DIV",1,,DIV,MUL
-  ld a0, (sp)
-  ld a1, 8(sp)
-  addi sp, sp, 8
-  div a1, a1, a0
-  sd a1, (sp)
-  NEXT
-
-  defcode "MOD",3,,MOD,DIV
-  ld a0, (sp)
-  ld a1, 8(sp)
-  addi sp, sp, 8
-  rem a1, a1, a0
-  sd a1, (sp)
-  NEXT
-
-  defcode "/MOD",4,,DIVMOD,MOD
+  defcode "/MOD",4,,DIVMOD,MUL
   ld a0, (sp) /* Top of stack */
   ld a1, 8(sp)
   div a3, a1, a0
   rem a1, a1, a0
-  sd a3, (sp)
-  sd a1, 8(sp)
+  sd a3, (sp)  /* top of stack: quotient */
+  sd a1, 8(sp) /* after that: remainder  */
   NEXT
-
 
   defcode "=",1,,EQU,DIVMOD
   ld a0, (sp)
@@ -569,8 +552,8 @@ var_\name:
   .macro defconst name, namelen, flags=0, label, value, prev
   defcode \name,\namelen,\flags,\label,\prev
   li t0, \value
-  sd t0, (sp)
   addi sp, sp, -8
+  sd t0, (sp)
   NEXT
   .endm
 
@@ -600,7 +583,7 @@ var_\name:
   defconst "SYS_CREAT",9,,SYS_CREAT,__NR_creat,SYS_WRITE
   defconst "SYS_BRK",7,,SYS_BRK,__NR_brk,SYS_CREAT
 */
-	defconst "O_RDONLY",8,,__O_RDONLY,0,__F_HIDDEN
+	defconst "O_RDONLY",8,,__O_RDONLY,0,__F_LENMASK
 	defconst "O_WRONLY",8,,__O_WRONLY,1,__O_RDONLY
 	defconst "O_RDWR",6,,__O_RDWR,2,__O_WRONLY
 	defconst "O_CREAT",7,,__O_CREAT,0100,__O_RDWR
@@ -621,7 +604,7 @@ var_\name:
   PUSHRSP a0
   NEXT
 
-  defcode "R<",2,,FROMR,TOR
+  defcode "R>",2,,FROMR,TOR
   POPRSP a0
   addi sp, sp, -8
   sd a0, (sp)
@@ -823,7 +806,7 @@ end_of_word:
 
   .data
 word_buffer:
-  .space 32
+  .space 64
 
 
   /* Returns two things on the stack: the number of unconverted
@@ -1244,15 +1227,15 @@ _COMMA:
   defcode "LITSTRING",9,,LITSTRING,ZBRANCH
   ld a0, (gp)     // Get the length of the string
   addi gp, gp, 8  // Move gp forward
-  ld a1, (gp)
+    /*ld a1, (gp) */
 
-  sd a1, (sp)
-  sd a2, -8(sp)
   addi sp, sp, -16
+  sd a0, (sp)
+  sd gp, 8(sp)
 
   add gp, gp, a0  // Skip the literal string
-  addi gp, gp, 3  // Advance to the next 4-byte boundary
-  addi gp, gp, ~3
+  addi gp, gp, 7  // Advance to the next 8-byte boundary
+  and gp, gp, ~7
   NEXT
 
   defcode "TELL",4,,TELL,LITSTRING

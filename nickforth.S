@@ -82,6 +82,9 @@ _start:
   sd t1, (t0)
   la t0, var_S0
   sd sp, (t0)
+  la t0, var_LATEST
+  la t1, name_INTERPRET
+  sd t1, (t0)
 
   la gp, cold_start
 

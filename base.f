@@ -609,3 +609,14 @@
 
   2DROP
 ;
+
+: :NONAME
+    0 0 CREATE
+    HERE @
+    DOCOL ,
+    ]
+;
+
+: ['] IMMEDIATE
+    ' LIT ,
+;

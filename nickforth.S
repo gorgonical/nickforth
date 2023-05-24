@@ -1109,6 +1109,7 @@ _TCFA:
 
   /* Store the actual word itself, byte by byte */
 store_chars:
+  beqz a0, no_more_chars
   mv t2, zero
   lb t2, (a1)    /* Get character from name */
   addi a1, a1, 1
@@ -1116,7 +1117,8 @@ store_chars:
   addi t3, t3, 1
 
   addi a0, a0, -1
-  bnez a0, store_chars
+  j store_chars
+no_more_chars:
 
   /* Align */
   addi t3, t3, 7
@@ -1271,8 +1273,14 @@ write_char_loop:
   sd t0, (sp)
   NEXT
 
+  defcode "EXECUTE",7,,EXECUTE,CHAR
+  ld t0, (sp)
+  addi sp, sp, 8
+  ld t1, (t0)
+  jr t1
+
   /* There is no way this is correct. Need to graph this out */
-  defcode "INTERPRET",9,,INTERPRET,CHAR
+  defcode "INTERPRET",9,,INTERPRET,EXECUTE
   SAVECALL _WORD // a1 base address, a0 length
 interpret_word: 
 

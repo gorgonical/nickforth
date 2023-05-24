@@ -31,11 +31,50 @@
 : ';' [ CHAR ; ] LITERAL ;
 : '(' [ CHAR ( ] LITERAL ;
 : ')' [ CHAR ) ] LITERAL ;
+: '[' [ CHAR [ ] LITERAL ;
+: ']' [ CHAR ] ] LITERAL ;
 : '"' [ CHAR " ] LITERAL ;
 : 'A' [ CHAR A ] LITERAL ;
+: 'B' [ CHAR B ] LITERAL ;
+: 'C' [ CHAR C ] LITERAL ;
+: 'D' [ CHAR D ] LITERAL ;
+: 'E' [ CHAR E ] LITERAL ;
+: 'F' [ CHAR F ] LITERAL ;
+: 'G' [ CHAR G ] LITERAL ;
+: 'H' [ CHAR H ] LITERAL ;
+: 'I' [ CHAR I ] LITERAL ;
+: 'J' [ CHAR J ] LITERAL ;
+: 'K' [ CHAR K ] LITERAL ;
+: 'L' [ CHAR L ] LITERAL ;
+: 'M' [ CHAR M ] LITERAL ;
+: 'N' [ CHAR N ] LITERAL ;
+: 'O' [ CHAR O ] LITERAL ;
+: 'P' [ CHAR P ] LITERAL ;
+: 'Q' [ CHAR Q ] LITERAL ;
+: 'R' [ CHAR R ] LITERAL ;
+: 'S' [ CHAR S ] LITERAL ;
+: 'T' [ CHAR T ] LITERAL ;
+: 'U' [ CHAR U ] LITERAL ;
+: 'V' [ CHAR V ] LITERAL ;
+: 'W' [ CHAR W ] LITERAL ;
+: 'X' [ CHAR X ] LITERAL ;
+: 'Y' [ CHAR Y ] LITERAL ;
+: 'Z' [ CHAR Z ] LITERAL ;
 : '0' [ CHAR 0 ] LITERAL ;
+: '1' [ CHAR 1 ] LITERAL ;
+: '2' [ CHAR 2 ] LITERAL ;
+: '3' [ CHAR 3 ] LITERAL ;
+: '4' [ CHAR 4 ] LITERAL ;
+: '5' [ CHAR 5 ] LITERAL ;
+: '6' [ CHAR 6 ] LITERAL ;
+: '7' [ CHAR 7 ] LITERAL ;
+: '8' [ CHAR 8 ] LITERAL ;
+: '9' [ CHAR 9 ] LITERAL ;
 : '-' [ CHAR - ] LITERAL ;
 : '.' [ CHAR . ] LITERAL ;
+
+: CLRPAGE 27 EMIT '[' EMIT '2' EMIT 'J' EMIT NEWLINE ;
+: CLRLINE 27 EMIT '[' EMIT '2' EMIT 'K' EMIT ;
 
 : [COMPILE] IMMEDIATE
   WORD
@@ -451,6 +490,7 @@
   HERE !
 ;
 
+( addr len -- )
 : DUMP
   BASE @ -ROT
   HEX
@@ -464,17 +504,6 @@
 
     2DUP
     1- 15 AND 1+
-    BEGIN
-      ?DUP
-    WHILE
-      SWAP
-      DUP C@
-      2 .R SPACE
-      1+ SWAP 1-
-    REPEAT
-    DROP
-
-    2DUP 1- 15 AND 1+
     BEGIN
       ?DUP
     WHILE
@@ -620,3 +649,104 @@
 : ['] IMMEDIATE
     ' LIT ,
 ;
+
+: EXCEPTION-MARKER
+  RDROP
+  0
+;
+
+: CATCH
+  DSP@ 8+ >R
+  ' EXCEPTION-MARKER 8+
+  >R
+  EXECUTE
+;
+
+: THROW
+  ?DUP IF
+    RSP@
+    BEGIN
+      DUP R0 8- <
+    WHILE
+      DUP @
+      ' EXCEPTION-MARKER 8+ = IF
+        8+
+        RSP!
+
+        DUP DUP DUP
+
+        R>
+        8-
+        SWAP OVER
+        !
+        DSP! EXIT
+      THEN
+      8+
+    REPEAT
+
+    DROP
+
+    CASE
+      0 1- OF ( ABORT )
+        ." ABORTED " CR
+      ENDOF
+      ( DEFAULT FALLTHROUGH )
+      ." UNCAUGHT THROW "
+      DUP . CR
+    ENDCASE
+    QUIT
+  THEN
+;
+
+: ABORT
+  0 1- THROW
+;
+
+: PRINT-STACK-TRACE
+  RSP@
+  BEGIN
+    DUP R0 8- <
+  WHILE
+    DUP @
+    CASE
+      EXCEPTION-MARKER 8- OF
+        ." CATCH ( DSP="
+        8+ DUP @ U.
+        ." ) "
+      ENDOF
+      ( DEFAULT CASE )
+      DUP
+      CFA>
+      ?DUP IF
+        2DUP
+        ID.
+        [ CHAR + ] LITERAL EMIT
+        SWAP >DFA 8+ - .
+      THEN
+    ENDCASE
+    8+
+  REPEAT
+  DROP
+  CR
+;
+
+: UNUSED
+  D0 1024 1024 * +
+  HERE @
+  -
+  8 /
+;
+
+: WELCOME
+  S" TEST-MODE" FIND NOT IF
+    ." NICKFORTH VERSION " VERSION . NEWLINE
+    UNUSED . ." CELLS REMAINING" NEWLINE
+    ." OK "
+    NEWLINE
+  THEN
+;
+
+CLRPAGE
+WELCOME
+HIDE WELCOME
+CLRLINE

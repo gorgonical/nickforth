@@ -571,7 +571,8 @@ var_\name:
 
   defconst "VERSION",7,,VERSION,NICK_VERSION,BASE
   defconst_addr "R0",2,,RZ,return_stack_top,VERSION
-  defconst_addr "DOCOL",5,,__DOCOL,DOCOL,RZ
+  defconst_addr "D0",2,,DZ,data_segment_start,RZ
+  defconst_addr "DOCOL",5,,__DOCOL,DOCOL,DZ
   defconst "F_IMMED",7,,__F_IMMED,F_IMMED,__DOCOL
   defconst "F_HIDDEN",8,,__F_HIDDEN,F_HIDDEN,__F_IMMED
   defconst "F_LENMASK",9,,__F_LENMASK,F_LENMASK,__F_HIDDEN
@@ -1366,7 +1367,7 @@ interpret_is_lit:
 serial_port_addr:
   .dword 0x10000000
 
-  .set INITIAL_DATA_SEGMENT_SIZE,65536
+  .set INITIAL_DATA_SEGMENT_SIZE,1024*1024
   .set INITIAL_PARAM_STACK_SIZE,65536
 	.set RETURN_STACK_SIZE,8192
 

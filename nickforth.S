@@ -543,7 +543,8 @@ var_\name:
   */
 
   defvar "STATE",5,,STATE,CMOVE
-  defvar "HERE",4,,HERE,STATE
+  defvar "LINEMODE",8,,LINEMODE,STATE
+  defvar "HERE",4,,HERE,LINEMODE
   defvar "LATEST",6,,LATEST,HERE,name_INTERPRET
   defvar "S0",2,,S0,LATEST
   defvar "BASE",4,,BASE,S0,10
@@ -573,7 +574,8 @@ var_\name:
   defconst_addr "R0",2,,RZ,return_stack_top,VERSION
   defconst_addr "D0",2,,DZ,data_segment_start,RZ
   defconst_addr "DOCOL",5,,__DOCOL,DOCOL,DZ
-  defconst "F_IMMED",7,,__F_IMMED,F_IMMED,__DOCOL
+  defconst_addr "LINEBUF",7,,LINEBUF,line_buffer,__DOCOL
+  defconst "F_IMMED",7,,__F_IMMED,F_IMMED,LINEBUF
   defconst "F_HIDDEN",8,,__F_HIDDEN,F_HIDDEN,__F_IMMED
   defconst "F_LENMASK",9,,__F_LENMASK,F_LENMASK,__F_HIDDEN
 
@@ -726,19 +728,39 @@ bufftop:
   Probably we don't want (at first?) interrupts and will settle for polling.
 */
 _KEY:
+  /* Check if we are in linemode */
+  la t0, var_LINEMODE
+  ld t0, (t0)
+  bnez t0, _KEY_LINEMODE
+
+_KEY_CHARMODE:
   la a1, serial_port_addr // Load address of variable containing address of serial port.
   ld a1, (a1)                 // Load serial port's address.
-  /* Need to check read to receive? */
-
   /* Until byte is ready, keep looping. If KEY is called and there are
 	no bytes available, the intention is to loop forever. */
-
 key_loop:
   mv a0, zero
-  lbu a0, (a1)                 // Fetch byte from recv buffer. Offset is 0.
-  /* Need to put the fetched byte into a0 */
+  lbu a0, (a1)
   beqz a0, key_loop
   sb a0, (a1) /* Echo the byte back to the serial port. */
+  ret
+
+_KEY_LINEMODE:
+  la a1, line_buffer
+  la a2, curpos
+  ld a3, (a2) /* Get offset */
+  la t0, line_end
+  ld t0, (t0)
+  add a0, a1, a3
+  sub t0, t0, a0 /* If curpos+line_buffer (a0) goes past line_end (t0), we are out of characters. */
+  bltz t0, outofcharacters
+  lbu a0, (a0)
+  addi a3, a3, 1
+  sd a3, (a2) /* Update curpos */
+  ret
+
+outofcharacters:
+  li a0, 0 /* Load zero to indicate */
   ret
 
   /* Only 1 param, the byte to write. Unlike the original Jonesforth. */
@@ -780,12 +802,15 @@ _WORD:
   sub a2, a0, a2
   blez a1, 1b
 
+
   /* Search for the end of the word, storing characters as we go. */
   la a2, word_buffer
 2:
   sb a0, (a2)
   addi a2, a2, 1 /* Increment the buffer position. */
+  mv s6, a2
   SAVECALL _KEY
+  mv a2, s6
   li a1, ' '
   sub a1, a0, a1 /* Is it blank? If not, keep reading */
   beqz a1, end_of_word
@@ -812,11 +837,66 @@ end_of_word:
 word_buffer:
   .space 64
 
+  defcode "LINE",4,,LINE,WORD
+  SAVECALL _LINE
+  addi sp, sp, -8
+  sd a0, (sp)
+  NEXT
+
+_LINE:
+  /* Fetch characters, storing them in the linebuffer until we find
+	the newline character or a backspace. */
+  la a3, curpos /* Reset curpos, too */
+  li a1, 0
+  sd a1, (a3)
+  la a3, line_buffer
+1:
+  SAVECALL _KEY_CHARMODE /* key in a0 */
+  li a1, 0x8
+  sub a1, a0, a1
+  beqz a1, line_bs
+
+  sb a0, (a3)
+  addi a3, a3, 1
+
+  li a1, '\r'
+  sub a1, a0, a1
+  beqz a1, line_done
+
+  /* Should think about what happens if the line is really long. */
+
+  j 1b
+
+line_done:
+  /* Get length of line in characters */
+  la a1, line_buffer
+  sub a0, a3, a1
+  la a4, line_end
+  add a0, a1, a0
+  sd a0, (a4)
+  ret
+
+line_bs:
+  addi a3, a3, -1
+  li a0, 0
+  sb a0, (a3)
+  li a0, ' '
+  SAVECALL _EMIT
+  li a0, 0x8
+  SAVECALL _EMIT
+  j 1b
+
+line_end:
+  .dword 0
+curpos:
+  .dword 0
+line_buffer:
+  .space 256
 
   /* Returns two things on the stack: the number of unconverted
 	characters (thus 0 indicates success), and second is the parsed
 	number itself, or a partial value. */
-  defcode "NUMBER",6,,NUMBER,WORD
+  defcode "NUMBER",6,,NUMBER,LINE
   ld a0, (sp) /* Length of string */
   ld a1, 8(sp) /* Base address */
   SAVECALL _NUMBER
@@ -1285,8 +1365,13 @@ write_char_loop:
 
   /* There is no way this is correct. Need to graph this out */
   defcode "INTERPRET",9,,INTERPRET,EXECUTE
+  la t0, var_LINEMODE
+  ld t0, (t0)
+  beqz t0, not_linemode
+  SAVECALL _LINE
+not_linemode:
   SAVECALL _WORD // a1 base address, a0 length
-interpret_word: 
+interpret_word:
 
   mv t0, zero
   la t1, interpret_is_lit

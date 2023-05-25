@@ -378,6 +378,10 @@
      THEN
 ;
 
+( Words to change whether we are reading by line or characters )
+: USELINES 1 LINEMODE ! ." LINES ON" NEWLINE ;
+: USECHARS 0 LINEMODE ! ." CHARS ON" NEWLINE ;
+
 : CONSTANT
   WORD     ( get the name, follows constant )
   CREATE   ( make entry )

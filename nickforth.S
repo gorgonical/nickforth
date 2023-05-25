@@ -846,12 +846,25 @@ word_buffer:
 _LINE:
   /* Fetch characters, storing them in the linebuffer until we find
 	the newline character or a backspace. */
-  la a3, curpos /* Reset curpos, too */
-  li a1, 0
-  sd a1, (a3)
   la a3, line_buffer
+  la a6, curpos
+
+  /* If we still have stuff in the line we should use it instead of fetching more */
+  la a4, line_end
+  ld a4, (a4)
+  ld a6, (a6)    /* Get curpos */
+  add a6, a6, a3 /* Get where we are currently in the line_buffer */
+  sub a5, a4, a6 /* Number of characters */
+  blez a5, reset_line
+  ret            /* If there's still characters, immediately return */
+reset_line:
+  /* Reset curpos, too */
+  la a6, curpos
+  li a1, 0
+  sd a1, (a6)
 1:
   SAVECALL _KEY_CHARMODE /* key in a0 */
+line_get:
   li a1, 0x8
   sub a1, a0, a1
   beqz a1, line_bs

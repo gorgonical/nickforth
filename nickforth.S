@@ -870,9 +870,11 @@ _LINE:
 line_done:
   /* Get length of line in characters */
   la a1, line_buffer
-  sub a0, a3, a1
-  la a4, line_end
+  sub a0, a3, a1 /* a0 now has number of characters in it */
+  addi a0, a0, -1
+  beqz a0, _LINE
   add a0, a1, a0
+  la a4, line_end
   sd a0, (a4)
   ret
 

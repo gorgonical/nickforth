@@ -1488,6 +1488,7 @@ return_stack_top:
   /* Forth return stack starts here */
   .dword 0x0
 
+  .section .end.data
   .align 12 /* Page aligned */
   /* The data segment where definitions go */
   .globl data_segment_start

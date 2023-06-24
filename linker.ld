@@ -17,4 +17,8 @@ SECTIONS
      *(.bss);
 }
 
+.end.data : {
+     *(.end.data);
+}
+
 }

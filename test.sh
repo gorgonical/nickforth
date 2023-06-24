@@ -43,10 +43,10 @@ for test_case in "${test_cases[@]}"; do
         cat ./tests/${TEST_CASE}_expected.out
     else
         echo "Test \"${test_case}\" passed."
+        rm ${SCREEN_LOGFILE} ${CLEANED_LOGFILE}
     fi
 
 done
-
 
 QEMU_PIDS_AFTER=$(pgrep qemu)
 NEW_QEMU_PIDS=$(comm -13 <(echo "${QEMU_PIDS_BEFORE}") <(echo "${QEMU_PIDS_AFTER}") )

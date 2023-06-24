@@ -1387,6 +1387,7 @@ write_char_loop:
 not_linemode:
   SAVECALL _WORD // a1 base address, a0 length
 interpret_word:
+  /* If we get a zero base addr here we have a problem */
 
   mv t0, zero
   la t1, interpret_is_lit

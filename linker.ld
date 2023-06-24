@@ -5,16 +5,16 @@ SECTIONS
       *(.text);
 }
 
-.bss : {
-     *(.bss);
-}
-
 .rodata : {
         *(.rodata);
 }
 
 .data : {
       *(.data);
+}
+
+.bss : {
+     *(.bss);
 }
 
 }

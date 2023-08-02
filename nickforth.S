@@ -32,6 +32,31 @@
   %esi points to the next codeword, which is equivalent to gp.
 
   */
+
+/*
+  Registers used:
+	  - gp: The address of the next codeword. While running a word, gp
+	points to the definition of the word. Thus when a word is finished
+	executing it calls NEXT, which jumps to execution of the next word
+	in the definition. Words that call other words must preserve gp,
+	which DOCOL does by pushing the existing gp onto the return stack.
+	EXIT restores the caller's gp and calls NEXT to resume execution
+	there.
+
+    - fp: This register always points to the return stack pointer.
+	This could be elided by load/stores to store the latest, but we keep
+	the top of the return stack here. We use this for exactly three things:
+      1. Storing gp when we run a word from within a word.
+      2. Storing ra when we `call` a procedure that we will `ret` from inside a word
+      3. Four words that allow manipulating the return stack: >R, R>, RSP@, RSP!
+
+    - sp: This is the ordinary parameter/data stack pointer that is
+	used consistent with how everyone else uses sp, basically.
+
+    - tp: Not used
+
+    - ra: Used in the normal way, but only within SAVECALL and ret within a procedure.
+*/
   .macro NEXT
   ld   t0, (gp)    /* Load address of the next codeword from gp */
   addi gp, gp, 8   /* Increment gp */

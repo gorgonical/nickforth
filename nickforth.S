@@ -917,6 +917,10 @@ line_done:
   add a0, a1, a0
   la a4, line_end
   sd a0, (a4)
+  li a0, '\r'
+  SAVECALL _EMIT
+  li a0, '\n'
+  SAVECALL _EMIT
   ret
 
 line_bs:

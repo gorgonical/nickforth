@@ -754,7 +754,63 @@
   THEN
 ;
 
+( base exp -- base^exp )
+: POW
+  OVER
+  BEGIN
+    OVER 1 > 
+  WHILE
+    2 PICK *
+    SWAP 1 - SWAP
+  REPEAT
+  NIP NIP
+;
+
+( initval bytes -- )
+( name follows BUFFER )
+: BUFFER
+  ALLOT
+  WORD CREATE
+  DOCOL ,
+  ' LIT ,
+  ,
+  ' EXIT ,
+;
+
+( value nbits -- value << nbits )
+: LSL
+  BEGIN
+    DUP 0>
+  WHILE
+    SWAP 2 * SWAP
+    1 -
+  REPEAT
+  DROP
+;
+
+( value nbits -- value >> nbits )
+: LSR
+  BEGIN
+    DUP 0>
+  WHILE
+    SWAP 2 / SWAP
+    1 -
+  REPEAT
+  DROP
+;
+
+( n -- n_HI32 )
+: HIBITS
+  32 LSR
+;
+
+( n -- n_LO32 )
+: LOBITS
+  [ HEX ] FFFFFFFF AND [ DECIMAL ]
+;
+
 CLRPAGE
 WELCOME
 HIDE WELCOME
 CLRLINE
+USELINES

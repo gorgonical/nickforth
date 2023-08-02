@@ -401,7 +401,7 @@
 ( this works because the old value of here, that which allot now points to, is still on the stack )
 : VARIABLE
   1 CELLS ALLOT ( get 1 cell of memory )
-  WORD CREATE   ( create a word, name is after variable )
+  WORD CREATE   ( create a word, name is after VARIABLE )
   DOCOL ,       ( append docol )
   ' LIT ,       ( append lit )
   ,             ( append pointer to new memory )

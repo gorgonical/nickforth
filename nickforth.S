@@ -110,6 +110,9 @@ _start:
   la t0, var_LATEST
   la t1, name_INTERPRET
   sd t1, (t0)
+  la t0, var_LINEMODE
+  li t1, 0
+  sd t1, (t0)
 
   la gp, cold_start
 

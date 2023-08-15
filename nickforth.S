@@ -96,10 +96,19 @@ DOCOL:
   addi gp, t0, 8
   NEXT
 
+vec:
+  la t0, var_EXCPHAND
+  ld t1, (t0)
+  sd t1, (gp)
+  NEXT
+
   /* Assembler entry point. */
   .text
   .globl _start
 _start:
+  la t0, vec
+  csrw stvec, t0
+  
   la fp, return_stack_top
   la sp, param_stack_top
   la t0, var_HERE
@@ -484,7 +493,37 @@ code_\label:
   sd a1, (sp) //store on stack
   NEXT
 
-  defcode "+!",2,,ADDSTORE,FETCH
+  defcode "W!",2,,STOREWORD,FETCH
+  ld a0, (sp)
+  mv a1, zero
+  ld a1, 8(sp)
+  addi sp, sp, 16
+  sw a1, (a0)
+  NEXT
+
+  defcode "W@",2,,LOADWORD,STOREWORD
+  ld a0, (sp)
+  mv a1, zero
+  lw a1, (a0)
+  sd a1, (sp)
+  NEXT
+
+  defcode "H!",2,,STOREHALF,LOADWORD
+  ld a0, (sp)
+  mv a1, zero
+  ld a1, 8(sp)
+  addi sp, sp, 16
+  sh a1, (a0)
+  NEXT
+
+  defcode "H@",2,,LOADHALF,STOREHALF
+  ld a0, (sp)
+  mv a1, zero
+  lh a1, (a0)
+  sd a1, (sp)
+  NEXT
+
+  defcode "+!",2,,ADDSTORE,LOADHALF
   ld a0, (sp)  // address
   ld a1, 8(sp) // amt to add
   addi sp, sp, 16
@@ -575,7 +614,8 @@ var_\name:
   defvar "HERE",4,,HERE,LINEMODE
   defvar "LATEST",6,,LATEST,HERE,name_INTERPRET
   defvar "S0",2,,S0,LATEST
-  defvar "BASE",4,,BASE,S0,10
+  defvar "EXCPHAND",8,,EXCPHAND,S0,0
+  defvar "BASE",4,,BASE,EXCPHAND,10
 
   /*
   Built-in constants are also useful, and are a degenerate case of variables.
@@ -1410,8 +1450,18 @@ write_char_loop:
   ld t1, (t0)
   jr t1
 
+  /* Word to run C code. Store the state registers of fp and gp on the
+	stack. Then stash sp into the scratch register. Create a context for
+	the C program to run in. Jump to whatever we're supposed to jump to. */
+  defcode "RUNC",4,,RUNC,EXECUTE
+  addi sp, sp, -16
+  sd   gp,      8(sp)
+  sd   fp,       (sp)
+  csrw sscratch,  sp
+  NEXT
+
   /* There is no way this is correct. Need to graph this out */
-  defcode "INTERPRET",9,,INTERPRET,EXECUTE
+  defcode "INTERPRET",9,,INTERPRET,RUNC
   la t0, var_LINEMODE
   ld t0, (t0)
   beqz t0, not_linemode

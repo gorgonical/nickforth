@@ -193,6 +193,18 @@
     DROP
 ;
 
+( EXTRA: Writes N bytes of zero to addr )
+: MEMZERO ( n addr -- )
+    BEGIN
+      OVER 0>
+    WHILE
+      DUP -ROT ( N ADDR -- ADDR N ADDR )
+      0 SWAP C! ( ADDR N ADDR - ADDR N )
+      1- SWAP ( addr n - n-1 addr )
+    REPEAT
+    DROP DROP
+;
+
 ( Standard words for manipulating BASE. )
 : DECIMAL ( -- ) 10 BASE ! ;
 : HEX ( -- ) 16 BASE ! ;
@@ -506,8 +518,8 @@
     OVER 8 U.R
     SPACE
 
-    2DUP
-    1- 15 AND 1+
+    2DUP ( a len - a len a len )
+    1- 15 AND 1+ ( a len a len - a len a [len-1 & 0xf]+1 )
     BEGIN
       ?DUP
     WHILE
@@ -556,17 +568,18 @@
           REPEAT
 ;
 
+( codeword -- entry-or-0 )
 : CFA>
-  LATEST @
+  LATEST @ ( cw -- cw latest )
   BEGIN
-    ?DUP
+    ?DUP ( cw latest latest )
   WHILE
-    2DUP SWAP
-    16 - = IF
-      NIP
+    2DUP SWAP ( cw latest latest cw )
+    < IF ( cw latest latest==cw-16 )
+      NIP ( latest )
       EXIT
     THEN
-    @
+    @ ( cw latest-latest )
   REPEAT
   DROP
   0
@@ -707,13 +720,14 @@
 ;
 
 : PRINT-STACK-TRACE
+  ." BEGIN STACK TRACE " NEWLINE
   RSP@
   BEGIN
     DUP R0 8- <
   WHILE
     DUP @
     CASE
-      EXCEPTION-MARKER 8- OF
+      ' EXCEPTION-MARKER 8+ OF
         ." CATCH ( DSP="
         8+ DUP @ U.
         ." ) "
@@ -726,12 +740,14 @@
         ID.
         [ CHAR + ] LITERAL EMIT
         SWAP >DFA 8+ - .
+        NEWLINE
       THEN
     ENDCASE
     8+
   REPEAT
   DROP
-  CR
+  ." END STACK TRACE " NEWLINE
+  QUIT
 ;
 
 : UNUSED
@@ -809,8 +825,15 @@
   [ HEX ] FFFFFFFF AND [ DECIMAL ]
 ;
 
+: SET-VECTORS
+  WORD FIND >CFA EXCPHAND !
+  ." RESET VECTORS SET " NEWLINE
+;
+
+
 CLRPAGE
 WELCOME
 HIDE WELCOME
 CLRLINE
 USELINES
+SET-VECTORS PRINT-STACK-TRACE

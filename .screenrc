@@ -1,0 +1,3 @@
+bind Q readbuf core.f
+bind W paste .
+bind F readbuf virtio.f

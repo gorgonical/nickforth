@@ -98,8 +98,9 @@ DOCOL:
 
 vec:
   la t0, var_EXCPHAND
+  ld t0, (t0)
   ld t1, (t0)
-  sd t1, (gp)
+  jr t1
   NEXT
 
   /* Assembler entry point. */

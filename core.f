@@ -841,6 +841,22 @@
   ." RESET VECTORS SET " NEWLINE
 ;
 
+( rot, but with n items )
+: ROLL ( X0 I*X U.I -- I*X X0 )
+  DUP 0= IF DROP EXIT THEN SWAP >R 1- RECURSE R> SWAP
+;
+
+( X1 X2 X3 .. XN N -- )
+: NDROP
+  BEGIN
+    DUP 0>
+  WHILE
+    SWAP DROP
+    1-
+  REPEAT
+  DROP
+;
+
 
 CLRPAGE
 WELCOME

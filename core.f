@@ -245,6 +245,7 @@
     8+
   REPEAT
   DROP
+  NEWLINE
 ;
 
 : UWIDTH ( u -- )

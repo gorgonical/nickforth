@@ -525,6 +525,17 @@
     WHILE
       SWAP
       DUP C@
+      2 ZU.R SPACE
+      1+ SWAP 1-
+    REPEAT
+    DROP
+
+    2DUP 1- 15 AND 1+
+    BEGIN
+      ?DUP
+    WHILE
+      SWAP
+      DUP C@
       DUP 32 128 WITHIN IF
         EMIT
       ELSE

@@ -306,6 +306,19 @@
 ( finally we can define the pop print word )
 : . 0 .R SPACE ;
 
+: .S ( -- )
+  DSP@
+  BEGIN
+    DUP S0 @ <
+  WHILE
+    DUP @ .
+    SPACE
+    8+
+  REPEAT
+  DROP
+  NEWLINE
+;
+
 : U. U. SPACE ;
 
 : ? ( addr - ) @ . ;

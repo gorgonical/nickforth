@@ -5,7 +5,7 @@ OBJCOPY		     = $(CROSS_COMPILE)objcopy
 all: nickforth.bin
 
 nickforth: nickforth.S
-	source env.sh && $(CROSS_COMPILE)gcc -g -O0 -nostdlib -static \
+	source env.sh && $(CROSS_COMPILE)gcc -g -O0 -nostdlib -static -v \
 		-Tlinker.ld \
 		-Wl,-Ttext,0x80200000 \
 		-Wl,-static \

@@ -576,6 +576,7 @@ code_\label:
   ld a0, (sp)   // length
   ld a1, 8(sp)  // dest
   ld a2, 16(sp) // src
+  addi sp, sp, 24
 1:
   mv a3, zero
   lb a3, (a2)

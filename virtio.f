@@ -14,6 +14,10 @@ VIRTIO-QSZ 16  * BUFFER VIRTIO-DESC-TABLE
 512 BUFFER READ-BUFFER
 1   BUFFER READ-STATUS
 
+16  BUFFER WRITE-HEADER
+512 BUFFER WRITE-BUFFER
+1   BUFFER WRITE-STATUS
+
 8 BUFFER DESC-FREE-LIST
 0 VALUE LAST-SEEN-USED-IDX
 
@@ -286,6 +290,26 @@ DECIMAL
   AGAIN
 ;
 
+( i think the logic is to continually check the used-ring until we find this idx )
+( submitted-desc-idx -- )
+: WAIT-ON-WRITE
+  LAST-SEEN-USED-IDX ( desc-idx -- desc-idx last-idx )
+  BEGIN
+    VIRTIO-USED-RING USED-RING-IDX-ADDR ( desc-idx last-idx -- desc-idx last-idx curr-idx-addr )
+    H@ ( desc-idx last-idx curr-idx-addr -- desc-idx last curr )
+    OVER = NOT IF ( if last idx isn't the same as current idx )
+      8 * VIRTIO-USED-RING USED-RING-ELEM-ADDR + ( desc-idx -- desc-idx used_elem[idx] )
+      USED-ELEM-ID-ADDR ( desc-idx used_elem[idx] -- desc-idx used_elem[idx].id-addr )
+      W@ ( ... -- desc-idx used_elem[idx].id )
+      SWAP DUP -ROT ( desc-idx used_elem_id -- desc-idx id desc-idx )
+      = IF ( ... -- desc-idx )
+        FREE-DESC-CHAIN
+        EXIT
+      THEN
+    THEN
+  AGAIN
+;
+
 : VIRTQ-CONFIGURE
   0 VBD-VIRTQ-IDX W!
   VBD-VIRTQ-RDY @ 0 = ( CHECK IF READY IS 0 )
@@ -322,6 +346,31 @@ DECIMAL
   0 VBD-VIRTQ-NOTF W!
 ;
 
+( SECTOR-N -- desc-idx-head )
+: SUBMIT-WRITE
+  ( FIND 2 AVAILABLE DESCRIPTOR INDICES )
+  3 GET-FREE-DESCRIPTORS-IDX ( -- IDX1 IDX2 )
+  ( error check to confirm we got 3 free descriptors )
+  3 ERROR-CHECK-DESCRIPTOR-IDXS
+  3 ERROR-CHECK-DESCRIPTOR-IDXS
+  DUP  0 SWAP 1   SWAP WRITE-STATUS SWAP DESC-IDX-TO-ADDR MAKE-WRITE-DESCRIPTOR-TAIL ( ... -- IDX1 IDX2 IDX3 )
+  OVER        512 SWAP WRITE-BUFFER SWAP DESC-IDX-TO-ADDR MAKE-READ-DESCRIPTOR ( ... -- IDX1 IDX2 )
+  OVER        16  SWAP WRITE-HEADER SWAP DESC-IDX-TO-ADDR MAKE-READ-DESCRIPTOR ( ... -- IDX1 )
+  ( IDX1 IS NOW THE DESCRIPTOR-HEAD )
+  ( SECTOR-N IDX1 )
+  SWAP
+  ( NOW, CONFIGURE THE READ REQUEST TYPE, SECTOR )
+  WRITE-HEADER ( IDX1 SECTORN - IDX1 SECTOR-N READ-HEADER-ADDR )
+  TUCK 8 + ! ( IDX1 SECTOR-N READ-HEADER-ADDR -- IDX1 READ-HEADER-ADDR )
+  1 SWAP W! ( IDX1 READ-HEADER-ADDR -- IDX1 )
+
+  ( NOW THE READ REQUEST BUFFER IS CONFIGURED, STICK THE DESCRIPTOR HEAD INTO THE AVAIL RING. )
+  VIRTIO-GET-NEXT-RING-SLOT ( IDX1 -- IDX1 NEXT-RING-SLOT )
+  ( FILL AVAIL RING SLOTS WITH CONFIGURED DESCRIPTOR HEAD, ONLY THE ONE )
+  OVER -ROT ( IDX1 NEXT-RING-SLOT -- IDX1 IDX1 NEXT-RING-SLOT )
+  VIRTIO-UPDATE-AVAIL-RING  ( IDX1 IDX1 NEXT-RING-SLOT -- IDX1 )
+;
+
 ( read-req-desc-head-idx -- )
 : DUMP-READ-BUF
   DESC-IDX-TO-ADDR DESC-NEXT-ADDR H@
@@ -330,7 +379,28 @@ DECIMAL
   DUMP
 ;
 
+( len src-addr -- )
+: COPY-TO-WRITEBUF
+  WRITE-BUFFER SWAP CMOVE
+;
+
+( sector-n -- <completed write> )
+: DO-WRITE
+  SUBMIT-WRITE POKE-VIRTQ DUP WAIT-ON-WRITE
+;
+
+( sector-n -- <completed read> )
+: DO-READ
+  SUBMIT-READ POKE-VIRTQ DUP WAIT-ON-READ
+;
+
+( read-desc-idx -- data-addr )
+: IDX-TO-DATA-ADDR
+  DESC-IDX-TO-ADDR DESC-NEXT-ADDR H@
+  DESC-IDX-TO-ADDR DESC-ADDR-ADDR @
+;
+
 VIRTQ-CONFIGURE
-0 SUBMIT-READ
-POKE-VIRTQ
-DUP WAIT-ON-READ
+0 DO-READ
+
+( So now I can write sectors: 512 src-addr COPY-TO-WRITEBUF <SECTORNUM> SUBMIT-WRITE POKE-VIRTQ DUP WAIT-ON-WRITE )

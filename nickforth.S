@@ -96,6 +96,9 @@ DOCOL:
   addi gp, t0, 8
   NEXT
 
+holding_pen:
+  j holding_pen
+
 vec:
   la t0, var_EXCPHAND
   ld t0, (t0)
@@ -106,20 +109,41 @@ vec:
   /* Assembler entry point. */
   .text
   .globl _start
-_start:
+_start: 
   la t0, vec
   csrw stvec, t0
   
   la fp, return_stack_top
   la sp, param_stack_top
+
+  la t0, var_HAVEDEFS
+  ld t3, (t0)
+  bnez t3, have_defs
+
+no_defs:
   la t0, var_HERE
   la t1, data_segment_start
   sd t1, (t0)
-  la t0, var_S0
-  sd sp, (t0)
+
   la t0, var_LATEST
   la t1, name_INTERPRET
   sd t1, (t0)
+
+  j rejoin
+
+have_defs:
+  la t0, var_HERE
+  li t1, 0x8021d608 /* fill in later */
+  sd t1, (t0)
+
+  la t0, var_LATEST
+  li t1, 0x8021d518
+  sd t1, (t0)
+
+rejoin:
+  la t0, var_S0
+  sd sp, (t0)
+
   la t0, var_LINEMODE
   li t1, 0
   sd t1, (t0)
@@ -579,11 +603,11 @@ code_\label:
   addi sp, sp, 24
 1:
   mv a3, zero
-  lb a3, (a2)
-  sb a3, (a1)
-  addi a2, a2, 1
-  addi a1, a1, 1
-  addi a0, a0, -1
+  ld a3, (a2)
+  sd a3, (a1)
+  addi a2, a2, 8
+  addi a1, a1, 8
+  addi a0, a0, -8
   bgtz a0, 1b
   NEXT
 
@@ -616,8 +640,9 @@ var_\name:
   defvar "HERE",4,,HERE,LINEMODE
   defvar "LATEST",6,,LATEST,HERE,name_INTERPRET
   defvar "S0",2,,S0,LATEST
-  defvar "EXCPHAND",8,,EXCPHAND,S0,0
+  defvar "EXCPHAND",8,,EXCPHAND,S0,
   defvar "BASE",4,,BASE,EXCPHAND,10
+  defvar "HAVEDEFS",8,,HAVEDEFS,BASE,_HAVEDEFS
 
   /*
   Built-in constants are also useful, and are a degenerate case of variables.
@@ -640,7 +665,7 @@ var_\name:
   .endm
 
 
-  defconst "VERSION",7,,VERSION,NICK_VERSION,BASE
+  defconst "VERSION",7,,VERSION,NICK_VERSION,HAVEDEFS
   defconst_addr "R0",2,,RZ,return_stack_top,VERSION
   defconst_addr "D0",2,,DZ,data_segment_start,RZ
   defconst_addr "DOCOL",5,,__DOCOL,DOCOL,DZ
@@ -1576,5 +1601,3 @@ return_stack_top:
   .align 12 /* Page aligned */
   /* The data segment where definitions go */
   .globl data_segment_start
-data_segment_start:
-  .space INITIAL_DATA_SEGMENT_SIZE

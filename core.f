@@ -418,8 +418,8 @@
 ;
 
 : ALLOT ( n -- addr )
-  HERE @ SWAP ( here n )
-  HERE +! ( adds n to HERE, old HERE still on stack )
+  HERE @ SWAP ( here n -- )
+  HERE +! ( adds n to HERE, old HERE still on stack ) ( here n -- *here )
 ;
 
 : CELLS ( n -- n ) 8 * ;

@@ -11,3 +11,4 @@ qemu-system-riscv64 \
    -drive file=./disk.raw,if=none,id=d1 \
    -global virtio-mmio.force-legacy=false \
    -device virtio-blk-device,drive=d1 "$@"
+ 

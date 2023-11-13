@@ -379,7 +379,7 @@ DECIMAL
   DUMP
 ;
 
-( len src-addr -- )
+( src-addr len -- )
 : COPY-TO-WRITEBUF
   WRITE-BUFFER SWAP CMOVE
 ;
@@ -400,7 +400,32 @@ DECIMAL
   DESC-IDX-TO-ADDR DESC-ADDR-ADDR @
 ;
 
+( Not this simple because the write/read buffers are contained inside the data segment themselves, I think. )
+( begin end first-sector/s1 -- )
+: DUMP-MEMORY
+  -ROT SWAP
+  BEGIN ( s1 end begin -- )
+    2DUP >=
+  WHILE
+    .S
+    DUP 512 COPY-TO-WRITEBUF
+    .S
+    512 +
+    .S
+    ROT DUP 1+ SWAP
+    DO-WRITE
+    DROP
+    -ROT
+  REPEAT
+;
+
 VIRTQ-CONFIGURE
 0 DO-READ
+
+LATEST @ WRITE-BUFFER !
+HERE   @ WRITE-BUFFER 8 + !
+0 DO-WRITE
+
+D0
 
 ( So now I can write sectors: 512 src-addr COPY-TO-WRITEBUF <SECTORNUM> SUBMIT-WRITE POKE-VIRTQ DUP WAIT-ON-WRITE )
